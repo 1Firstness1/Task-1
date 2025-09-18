@@ -4,7 +4,7 @@ from logger import Logger
 """Тестирует подключение к базе данных и возвращает результат"""
 
 
-def test_db_connection(dbname="task1", user="artem", password="", host="localhost", port="5432"):
+def test_db_connection(dbname="task1", user="postgres", password="postgres", host="localhost", port="5432"):
     logger = Logger()
     try:
         connection = psycopg2.connect(

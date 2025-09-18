@@ -1,4 +1,6 @@
 import sys
+import os
+import psycopg2
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
                                QHBoxLayout, QWidget, QDialog, QMessageBox, QComboBox,
                                QSpinBox, QTableWidget, QTableWidgetItem, QLineEdit,
@@ -6,7 +8,6 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel, Q
                                QDoubleSpinBox, QHeaderView, QSplitter)
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QFont, QIcon, QPixmap
-import os
 from datetime import datetime
 
 from controller import TheaterController
@@ -109,6 +110,26 @@ class MainWindow(QMainWindow):
         self.data_tabs = QTabWidget()
         main_layout.addWidget(self.data_tabs)
 
+        # Создаем виджет с изображением
+        image_widget = QLabel()
+        image_path = os.path.join("assets", "foto.png")
+        if os.path.exists(image_path):
+            pixmap = QPixmap(image_path)
+            if not pixmap.isNull():
+                image_widget.setPixmap(pixmap.scaled(
+                    self.data_tabs.size(),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                ))
+                image_widget.setAlignment(Qt.AlignCenter)
+
+                # Добавляем виджет с изображением на первую вкладку
+                image_tab = QWidget()
+                image_layout = QVBoxLayout(image_tab)
+                image_layout.addWidget(image_widget)
+                self.data_tabs.addTab(image_tab, "Театр")
+                self.data_tabs.setCurrentIndex(0)
+
         # Обновляем информацию о состоянии игры
         self.update_game_info()
 
@@ -170,19 +191,152 @@ class MainWindow(QMainWindow):
             background-color: white;
             font-weight: bold;
         }
+        QComboBox {
+            background-color: white;
+            color: #333333;
+            border: 1px solid #c0c0c0;
+            padding: 4px;
+            min-height: 20px;
+        }
+        QComboBox QAbstractItemView {
+            background-color: white;
+            color: #333333;
+            selection-background-color: #d0e8ff;
+            selection-color: #333333;
+        }
+        QLineEdit {
+            background-color: white;
+            color: #333333;
+            border: 1px solid #c0c0c0;
+            padding: 4px;
+            min-width: 120px;
+        }
         """
         self.setStyleSheet(app_style)
 
     """Проверяет подключение к базе данных при запуске"""
 
     def check_db_connection(self):
-        game_data = self.controller.get_game_state()
-        if game_data is None:
-            QMessageBox.warning(
+        try:
+            # Проверяем подключение
+            if self.controller.db.connection is None or self.controller.db.connection.closed:
+                self.controller.db.connect()
+
+            # Проверяем наличие данных
+            self.controller.db.cursor.execute("SELECT 1 FROM information_schema.tables WHERE table_name = 'game_data'")
+            table_exists = self.controller.db.cursor.fetchone() is not None
+
+            if not table_exists:
+                # База данных существует, но нет нужных таблиц
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle("Структура базы данных не найдена")
+                msg_box.setText("Структура базы данных не найдена. Создать схемы и таблицы?")
+                msg_box.setIcon(QMessageBox.Warning)
+
+                create_btn = msg_box.addButton("Создать схемы и таблицы", QMessageBox.AcceptRole)
+                msg_box.addButton("Отмена", QMessageBox.RejectRole)
+
+                msg_box.exec()
+
+                if msg_box.clickedButton() == create_btn:
+                    self.create_database_schema()
+                    return
+                else:
+                    sys.exit(1)
+
+            # Проверяем данные в game_data
+            self.controller.db.cursor.execute("SELECT COUNT(*) FROM game_data")
+            count = self.controller.db.cursor.fetchone()[0]
+            if count == 0:
+                # Если таблица пуста, добавляем начальные данные
+                self.controller.db.cursor.execute("""
+                    INSERT INTO game_data (id, current_year, capital)
+                    VALUES (1, 2025, 1000000)
+                    ON CONFLICT (id) DO NOTHING
+                """)
+                self.controller.db.connection.commit()
+
+            # Получаем данные игры
+            game_data = self.controller.get_game_state()
+            if game_data is None:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка данных",
+                    "Не удалось получить данные игры. Проверьте базу данных."
+                )
+        except psycopg2.OperationalError as e:
+            # Ошибка подключения к БД - показываем сообщение и предлагаем создать БД
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Ошибка подключения к БД")
+            msg_box.setText(f"Не удалось подключиться к базе данных: {str(e)}")
+            msg_box.setIcon(QMessageBox.Critical)
+
+            create_btn = msg_box.addButton("Создать базу данных", QMessageBox.AcceptRole)
+            msg_box.addButton("Выход", QMessageBox.RejectRole)
+
+            msg_box.exec()
+
+            if msg_box.clickedButton() == create_btn:
+                self.create_database()
+            else:
+                sys.exit(1)
+        except Exception as e:
+            QMessageBox.critical(
                 self,
-                "Ошибка подключения",
-                "Не удалось подключиться к базе данных. Проверьте параметры подключения и убедитесь, что сервер PostgreSQL запущен."
+                "Ошибка",
+                f"Произошла непредвиденная ошибка: {str(e)}"
             )
+
+    """Создает базу данных и ее структуру"""
+
+    def create_database(self):
+        try:
+            # Подключаемся к PostgreSQL без указания базы данных
+            conn = psycopg2.connect(
+                user=self.controller.db.connection_params["user"],
+                password=self.controller.db.connection_params["password"],
+                host=self.controller.db.connection_params["host"],
+                port=self.controller.db.connection_params["port"]
+            )
+            conn.autocommit = True
+            cursor = conn.cursor()
+
+            # Создаем базу данных
+            dbname = self.controller.db.connection_params["dbname"]
+            cursor.execute(f"CREATE DATABASE {dbname}")
+
+            cursor.close()
+            conn.close()
+
+            # Создаем схему и наполняем данными
+            self.create_database_schema()
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Ошибка создания БД",
+                f"Не удалось создать базу данных: {str(e)}"
+            )
+            sys.exit(1)
+
+    """Создает схему базы данных и заполняет начальными данными"""
+
+    def create_database_schema(self):
+        result = self.controller.initialize_database()
+        if result:
+            QMessageBox.information(
+                self,
+                "Успех",
+                "База данных успешно создана и заполнена начальными данными."
+            )
+            self.update_game_info()
+        else:
+            QMessageBox.critical(
+                self,
+                "Ошибка",
+                "Не удалось создать схему базы данных. Проверьте логи для получения подробной информации."
+            )
+            sys.exit(1)
 
     """Обновляет информацию о текущем годе и капитале"""
 
@@ -266,6 +420,27 @@ class MainWindow(QMainWindow):
             )
             self.update_game_info()
 
+    """Обрабатывает изменение размера окна"""
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+
+        # Обновляем размер изображения при изменении размера окна
+        if hasattr(self, 'data_tabs') and self.data_tabs.count() > 0:
+            image_tab = self.data_tabs.widget(0)
+            if image_tab:
+                image_widget = image_tab.findChild(QLabel)
+                if image_widget and hasattr(image_widget, 'pixmap') and image_widget.pixmap():
+                    image_path = os.path.join("assets", "foto.png")
+                    if os.path.exists(image_path):
+                        pixmap = QPixmap(image_path)
+                        if not pixmap.isNull():
+                            image_widget.setPixmap(pixmap.scaled(
+                                self.data_tabs.size(),
+                                Qt.KeepAspectRatio,
+                                Qt.SmoothTransformation
+                            ))
+
     """Обработчик закрытия приложения"""
 
     def closeEvent(self, event):
@@ -306,6 +481,11 @@ class NewPerformanceDialog(QDialog):
         self.plot_combo.currentIndexChanged.connect(self.update_roles_section)
         form_layout.addRow("Сюжет:", self.plot_combo)
 
+        # Информация о сюжете (перемещена под выпадающий список)
+        self.plot_info = QLabel()
+        self.plot_info.setWordWrap(True)
+        form_layout.addRow(self.plot_info)
+
         self.year_label = QLabel(f"{self.game_data['current_year']}")
         form_layout.addRow("Год постановки:", self.year_label)
 
@@ -322,10 +502,6 @@ class NewPerformanceDialog(QDialog):
 
         self.remaining_budget_label = QLabel()
         form_layout.addRow("Оставшийся бюджет:", self.remaining_budget_label)
-
-        self.plot_info = QLabel()
-        self.plot_info.setWordWrap(True)
-        form_layout.addRow("Информация о сюжете:", self.plot_info)
 
         main_layout.addLayout(form_layout)
 
@@ -375,13 +551,15 @@ class NewPerformanceDialog(QDialog):
         if not plot:
             return
 
-        # Обновляем информацию о сюжете
+        # Обновляем информацию о сюжете и перемещаем ее под выпадающий список
         self.plot_info.setText(
-            f"Минимальный бюджет: {plot['minimum_budget']:,} ₽\n"
-            f"Стоимость постановки: {plot['production_cost']:,} ₽\n"
-            f"Количество ролей: {plot['roles_count']}\n"
+            f"<b>Информация о сюжете:</b><br>"
+            f"Минимальный бюджет: {plot['minimum_budget']:,} ₽<br>"
+            f"Стоимость постановки: {plot['production_cost']:,} ₽<br>"
+            f"Количество ролей: {plot['roles_count']}<br>"
             f"Спрос: {plot['demand']}/10"
         )
+        self.plot_info.setStyleSheet("background-color: #f0f0f0; padding: 10px; border-radius: 5px;")
 
         # Устанавливаем минимальный бюджет
         min_budget = max(100000, plot['minimum_budget'])
@@ -465,8 +643,11 @@ class NewPerformanceDialog(QDialog):
             role_frame.setProperty("contract_cost", 0)  # Начальная стоимость
             role_layout = QHBoxLayout(role_frame)
 
+            # Увеличиваем минимальную ширину поля для названия роли
             role_name = QLineEdit()
             role_name.setPlaceholderText(f"Роль {i + 1}")
+            role_name.setMinimumWidth(180)  # Увеличиваем минимальную ширину
+            role_name.setStyleSheet("color: white;")  # Меняем цвет текста на белый
 
             actor_combo = QComboBox()
             actor_combo.addItem("Выберите актера", None)
@@ -481,13 +662,13 @@ class NewPerformanceDialog(QDialog):
                         if actor:
                             costs = self.calculate_contract_cost(actor)
                             label.setText(
-                                f"Контракт: {costs['contract']:,} ₽ + "
-                                f"Премия: {costs['premium']:,} ₽ = "
-                                f"Итого: {costs['total']:,} ₽".replace(',', ' ')
+                                f"<b>Контракт:</b> {costs['contract']:,} ₽<br>"
+                                f"<b>Премия:</b> {costs['premium']:,} ₽<br>"
+                                f"<b>Итого:</b> {costs['total']:,} ₽".replace(',', ' ')
                             )
                             frame.setProperty("contract_cost", costs['total'])
                     else:
-                        label.setText("Контракт: — ₽")
+                        label.setText("<b>Контракт:</b> — ₽")
                         frame.setProperty("contract_cost", 0)
 
                     # Обновляем списки доступных актеров
@@ -496,16 +677,23 @@ class NewPerformanceDialog(QDialog):
                 return on_actor_selected
 
             # Создаем метку для отображения стоимости контракта
-            contract_label = QLabel("Контракт: — ₽")
+            contract_label = QLabel("<b>Контракт:</b> — ₽")
             contract_label.setWordWrap(True)
+            contract_label.setStyleSheet("color: white;")  # Меняем цвет текста на белый
 
             # Подключаем обработчик выбора актера
             actor_combo.currentIndexChanged.connect(create_actor_selected_handler(role_frame, contract_label))
 
+            # Меняем цвет текста в метках на белый
+            role_label = QLabel(f"Роль {i + 1}:")
+            role_label.setStyleSheet("color: white;")
+            actor_label = QLabel("Актер:")
+            actor_label.setStyleSheet("color: white;")
+
             # Собираем виджеты в layout
-            role_layout.addWidget(QLabel(f"Роль {i + 1}:"))
+            role_layout.addWidget(role_label)
             role_layout.addWidget(role_name, 2)
-            role_layout.addWidget(QLabel("Актер:"))
+            role_layout.addWidget(actor_label)
             role_layout.addWidget(actor_combo, 3)
             role_layout.addWidget(contract_label, 2)
 
@@ -524,7 +712,7 @@ class NewPerformanceDialog(QDialog):
 
             if min_rank and min_rank in rank_order:
                 rank_label = QLabel(f"Мин. звание: {min_rank}")
-                rank_label.setStyleSheet("color: red;")
+                rank_label.setStyleSheet("color: red; font-weight: bold;")
                 role_layout.addWidget(rank_label)
 
             self.roles_layout.addWidget(role_frame)
@@ -786,15 +974,25 @@ class PerformanceHistoryDialog(QDialog):
             self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             self.history_table.setRowCount(len(self.performances))
 
+            # Сохраняем оригинальные индексы для правильного выбора при клике
+            self.row_to_performance_id = {}
+
             for i, perf in enumerate(self.performances):
                 year_item = QTableWidgetItem(str(perf['year']))
+                year_item.setData(Qt.UserRole, perf['performance_id'])  # Сохраняем ID для доступа после сортировки
+
                 title_item = QTableWidgetItem(perf['title'])
                 plot_item = QTableWidgetItem(perf['plot_title'])
                 budget_item = QTableWidgetItem(f"{perf['budget']:,} ₽".replace(',', ' '))
                 revenue_item = QTableWidgetItem(f"{perf['revenue']:,} ₽".replace(',', ' '))
 
+                # Для корректной сортировки храним числовые значения в данных пользователя
+                budget_item.setData(Qt.UserRole, perf['budget'])
+                revenue_item.setData(Qt.UserRole, perf['revenue'])
+
                 profit = perf['revenue'] - perf['budget']
                 profit_item = QTableWidgetItem(f"{profit:,} ₽".replace(',', ' '))
+                profit_item.setData(Qt.UserRole, profit)
 
                 if profit > 0:
                     profit_item.setForeground(Qt.green)
@@ -808,6 +1006,9 @@ class PerformanceHistoryDialog(QDialog):
                 self.history_table.setItem(i, 4, revenue_item)
                 self.history_table.setItem(i, 5, profit_item)
 
+                self.row_to_performance_id[i] = perf['performance_id']
+
+            self.history_table.setSortingEnabled(True)
             self.history_table.setEditTriggers(QTableWidget.NoEditTriggers)
             self.history_table.cellDoubleClicked.connect(self.show_performance_details)
 
@@ -825,7 +1026,8 @@ class PerformanceHistoryDialog(QDialog):
     """Показывает подробности выбранного спектакля"""
 
     def show_performance_details(self, row, col):
-        perf_id = self.performances[row]['performance_id']
+        # Получаем ID спектакля из данных ячейки, а не из исходного списка
+        perf_id = self.history_table.item(row, 0).data(Qt.UserRole)
         self.parent_window.show_performance_details(perf_id)
 
 

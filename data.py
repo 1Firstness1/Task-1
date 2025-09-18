@@ -181,6 +181,15 @@ class DatabaseManager:
 
     def init_sample_data(self):
         try:
+            # Проверяем, есть ли запись в game_data
+            self.cursor.execute("SELECT COUNT(*) FROM game_data")
+            if self.cursor.fetchone()[0] == 0:
+                # Если нет, добавляем начальные данные
+                self.cursor.execute("""
+                    INSERT INTO game_data (id, current_year, capital)
+                    VALUES (1, 2025, 1000000)
+                """)
+
             # Добавляем начальных актеров
             actors = [
                 ('Иванов', 'Иван', 'Иванович', 'Ведущий', 3, 5),
