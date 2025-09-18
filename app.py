@@ -130,11 +130,17 @@ class MainWindow(QMainWindow):
                 self.data_tabs.addTab(image_tab, "Театр")
                 self.data_tabs.setCurrentIndex(0)
 
-        # Обновляем информацию о состоянии игры
-        self.update_game_info()
-
-        # Проверяем соединение с базой данных
-        self.check_db_connection()
+        # Проверяем соединение с базой данных - делаем это перед обновлением информации
+        if not self.check_db_connection():
+            # Если соединения нет, блокируем все кнопки кроме выхода
+            self.reset_db_btn.setEnabled(False)
+            self.new_show_btn.setEnabled(False)
+            self.history_btn.setEnabled(False)
+            self.actors_btn.setEnabled(False)
+            self.skip_year_btn.setEnabled(False)
+        else:
+            # Обновляем информацию о состоянии игры только если есть соединение
+            self.update_game_info()
 
     """Устанавливает стили для приложения"""
 
@@ -215,14 +221,54 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(app_style)
 
     """Проверяет подключение к базе данных при запуске"""
+    """Проверяет подключение к базе данных при запуске"""
 
     def check_db_connection(self):
-        try:
-            # Проверяем подключение
-            if self.controller.db.connection is None or self.controller.db.connection.closed:
-                self.controller.db.connect()
+        # Сначала пробуем подключиться
+        if not self.controller.connect_to_database():
+            try:
+                # Проверяем, является ли ошибка отсутствием базы данных
+                conn = psycopg2.connect(
+                    user=self.controller.db.connection_params["user"],
+                    password=self.controller.db.connection_params["password"],
+                    host=self.controller.db.connection_params["host"],
+                    port=self.controller.db.connection_params["port"],
+                    database="postgres"  # Подключаемся к стандартной базе postgres
+                )
+                conn.close()
 
-            # Проверяем наличие данных
+                # Если мы смогли подключиться к postgres, значит проблема в отсутствии нашей БД
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle("База данных не существует")
+                msg_box.setText(f"База данных '{self.controller.db.connection_params['dbname']}' не существует.")
+                msg_box.setInformativeText("Хотите создать базу данных и настроить её для использования?")
+                msg_box.setIcon(QMessageBox.Question)
+
+                create_btn = msg_box.addButton("Создать БД, схемы и таблицы", QMessageBox.AcceptRole)
+                msg_box.addButton("Выход", QMessageBox.RejectRole)
+
+                msg_box.exec()
+
+                if msg_box.clickedButton() == create_btn:
+                    self.create_database()
+                    # После создания БД снова пробуем подключиться
+                    return self.controller.connect_to_database()
+                else:
+                    sys.exit(1)
+
+            except Exception as e:
+                # Если не удалось подключиться даже к postgres
+                QMessageBox.critical(
+                    self,
+                    "Критическая ошибка",
+                    f"Не удалось подключиться к серверу PostgreSQL: {str(e)}\n\nПроверьте, запущен ли сервер PostgreSQL."
+                )
+                sys.exit(1)
+
+            return False
+
+        try:
+            # Если подключение успешно, проверяем наличие нужных таблиц
             self.controller.db.cursor.execute("SELECT 1 FROM information_schema.tables WHERE table_name = 'game_data'")
             table_exists = self.controller.db.cursor.fetchone() is not None
 
@@ -234,13 +280,12 @@ class MainWindow(QMainWindow):
                 msg_box.setIcon(QMessageBox.Warning)
 
                 create_btn = msg_box.addButton("Создать схемы и таблицы", QMessageBox.AcceptRole)
-                msg_box.addButton("Отмена", QMessageBox.RejectRole)
+                msg_box.addButton("Выход", QMessageBox.RejectRole)
 
                 msg_box.exec()
 
                 if msg_box.clickedButton() == create_btn:
                     self.create_database_schema()
-                    return
                 else:
                     sys.exit(1)
 
@@ -256,36 +301,17 @@ class MainWindow(QMainWindow):
                 """)
                 self.controller.db.connection.commit()
 
-            # Получаем данные игры
-            game_data = self.controller.get_game_state()
-            if game_data is None:
-                QMessageBox.warning(
-                    self,
-                    "Ошибка данных",
-                    "Не удалось получить данные игры. Проверьте базу данных."
-                )
-        except psycopg2.OperationalError as e:
-            # Ошибка подключения к БД - показываем сообщение и предлагаем создать БД
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("Ошибка подключения к БД")
-            msg_box.setText(f"Не удалось подключиться к базе данных: {str(e)}")
-            msg_box.setIcon(QMessageBox.Critical)
+            return True
 
-            create_btn = msg_box.addButton("Создать базу данных", QMessageBox.AcceptRole)
-            msg_box.addButton("Выход", QMessageBox.RejectRole)
-
-            msg_box.exec()
-
-            if msg_box.clickedButton() == create_btn:
-                self.create_database()
-            else:
-                sys.exit(1)
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Ошибка",
-                f"Произошла непредвиденная ошибка: {str(e)}"
+                f"Произошла ошибка при проверке структуры базы данных: {str(e)}"
             )
+            return False
+
+    """Создает базу данных и ее структуру"""
 
     """Создает базу данных и ее структуру"""
 
@@ -296,7 +322,8 @@ class MainWindow(QMainWindow):
                 user=self.controller.db.connection_params["user"],
                 password=self.controller.db.connection_params["password"],
                 host=self.controller.db.connection_params["host"],
-                port=self.controller.db.connection_params["port"]
+                port=self.controller.db.connection_params["port"],
+                database="postgres"  # Подключаемся к стандартной базе postgres для создания новой БД
             )
             conn.autocommit = True
             cursor = conn.cursor()
@@ -307,6 +334,9 @@ class MainWindow(QMainWindow):
 
             cursor.close()
             conn.close()
+
+            # Подключаемся к новой базе данных
+            self.controller.db.connect()
 
             # Создаем схему и наполняем данными
             self.create_database_schema()
@@ -340,11 +370,18 @@ class MainWindow(QMainWindow):
 
     """Обновляет информацию о текущем годе и капитале"""
 
+    """Обновляет информацию о текущем годе и капитале"""
+
     def update_game_info(self):
-        game_data = self.controller.get_game_state()
-        if game_data:
-            self.year_label.setText(f"Текущий год: {game_data['current_year']}")
-            self.capital_label.setText(f"Капитал: {game_data['capital']:,} ₽".replace(',', ' '))
+        try:
+            game_data = self.controller.get_game_state()
+            if game_data:
+                self.year_label.setText(f"Текущий год: {game_data['current_year']}")
+                self.capital_label.setText(f"Капитал: {game_data['capital']:,} ₽".replace(',', ' '))
+        except Exception as e:
+            self.logger.error(f"Ошибка при обновлении информации: {str(e)}")
+            self.year_label.setText("Текущий год: —")
+            self.capital_label.setText("Капитал: —")
 
     """Сбрасывает базу данных к начальному состоянию"""
 

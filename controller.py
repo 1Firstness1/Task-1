@@ -7,12 +7,24 @@ from logger import Logger
 Обеспечивает связь между интерфейсом и базой данных.
 """
 
+"""
+Контроллер для управления бизнес-логикой театра.
+Обеспечивает связь между интерфейсом и базой данных.
+"""
+
 
 class TheaterController:
     def __init__(self):
         self.db = DatabaseManager()
         self.logger = Logger()
-        self.db.connect()
+        # Не выполняем подключение здесь, чтобы иметь возможность обработать ошибки
+        self.is_connected = False
+
+    """Пытается установить соединение с базой данных"""
+
+    def connect_to_database(self):
+        self.is_connected = self.db.connect()
+        return self.is_connected
 
     """Инициализирует базу данных и заполняет её начальными данными"""
 
