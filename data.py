@@ -5,6 +5,10 @@ import enum
 from datetime import datetime
 from logger import Logger
 
+"""
+Перечисление возможных званий актеров в порядке возрастания
+"""
+
 
 class ActorRank(enum.Enum):
     BEGINNER = "Начинающий"
@@ -13,6 +17,37 @@ class ActorRank(enum.Enum):
     MASTER = "Мастер"
     HONORED = "Заслуженный"
     PEOPLE = "Народный"
+
+    """Получает элемент перечисления по значению"""
+
+    @classmethod
+    def from_value(cls, value):
+        for member in cls:
+            if member.value == value:
+                return member
+        raise ValueError(f"'{value}' не является допустимым званием актера")
+
+    """Сравнивает два звания, возвращая -1, 0 или 1"""
+
+    @classmethod
+    def compare(cls, rank1, rank2):
+        r1 = cls.from_value(rank1)
+        r2 = cls.from_value(rank2)
+
+        if r1.value == r2.value:
+            return 0
+
+        rank_order = [cls.BEGINNER, cls.REGULAR, cls.LEAD, cls.MASTER, cls.HONORED, cls.PEOPLE]
+        idx1 = rank_order.index(r1)
+        idx2 = rank_order.index(r2)
+
+        return -1 if idx1 < idx2 else 1
+
+
+"""
+Класс для работы с базой данных PostgreSQL.
+Обеспечивает все операции с данными театра.
+"""
 
 
 class DatabaseManager:
@@ -28,22 +63,28 @@ class DatabaseManager:
         self.connection = None
         self.cursor = None
 
+    """Устанавливает соединение с базой данных"""
+
     def connect(self):
         try:
             self.connection = psycopg2.connect(**self.connection_params)
             self.cursor = self.connection.cursor(cursor_factory=DictCursor)
-            self.logger.info(f"Успешное подключение к базе данных {self.connection_params['dbname']}")
+            self.logger.info(f"Подключение к БД {self.connection_params['dbname']} успешно")
             return True
         except psycopg2.Error as e:
-            self.logger.error(f"Ошибка подключения к базе данных: {str(e)}")
+            self.logger.error(f"Ошибка подключения к БД: {str(e)}")
             return False
+
+    """Закрывает соединение с базой данных"""
 
     def disconnect(self):
         if self.cursor:
             self.cursor.close()
         if self.connection:
             self.connection.close()
-            self.logger.info("Соединение с базой данных закрыто")
+            self.logger.info("Соединение с БД закрыто")
+
+    """Создает схему базы данных"""
 
     def create_schema(self):
         try:
@@ -129,12 +170,14 @@ class DatabaseManager:
             """)
 
             self.connection.commit()
-            self.logger.info("Успешно создана схема базы данных")
+            self.logger.info("Схема БД успешно создана")
             return True
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка создания схемы базы данных: {str(e)}")
+            self.logger.error(f"Ошибка создания схемы БД: {str(e)}")
             return False
+
+    """Заполняет базу данных тестовыми данными"""
 
     def init_sample_data(self):
         try:
@@ -230,32 +273,67 @@ class DatabaseManager:
                 """, ap)
 
             self.connection.commit()
-            self.logger.info("Успешно добавлены тестовые данные")
+            self.logger.info("Тестовые данные успешно добавлены")
             return True
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при добавлении тестовых данных: {str(e)}")
+            self.logger.error(f"Ошибка добавления тестовых данных: {str(e)}")
             return False
+
+    """Сбрасывает базу данных к начальному состоянию"""
+
+    def reset_database(self):
+        try:
+            # Очищаем таблицы
+            self.cursor.execute("TRUNCATE TABLE actor_performances CASCADE")
+            self.cursor.execute("TRUNCATE TABLE performances CASCADE")
+            self.cursor.execute("TRUNCATE TABLE actors CASCADE")
+            self.cursor.execute("TRUNCATE TABLE plots CASCADE")
+            self.cursor.execute("TRUNCATE TABLE game_data CASCADE")
+
+            # Сбрасываем последовательности автоинкремента
+            self.cursor.execute("ALTER SEQUENCE actors_actor_id_seq RESTART WITH 1")
+            self.cursor.execute("ALTER SEQUENCE plots_plot_id_seq RESTART WITH 1")
+            self.cursor.execute("ALTER SEQUENCE performances_performance_id_seq RESTART WITH 1")
+
+            # Вставляем начальные данные игры
+            self.cursor.execute("""
+                INSERT INTO game_data (id, current_year, capital)
+                VALUES (1, 2025, 1000000)
+            """)
+
+            # Инициализируем остальные данные
+            self.init_sample_data()
+
+            self.connection.commit()
+            self.logger.info("База данных успешно сброшена")
+            return True
+        except psycopg2.Error as e:
+            self.connection.rollback()
+            self.logger.error(f"Ошибка сброса БД: {str(e)}")
+            return False
+
+    """Возвращает список всех актеров"""
 
     def get_actors(self):
         try:
-            self.cursor.execute("""
-                SELECT * FROM actors ORDER BY last_name, first_name
-            """)
+            self.cursor.execute("SELECT * FROM actors ORDER BY last_name, first_name")
             return self.cursor.fetchall()
         except psycopg2.Error as e:
-            self.logger.error(f"Ошибка при получении списка актеров: {str(e)}")
+            self.logger.error(f"Ошибка получения списка актеров: {str(e)}")
             return []
+
+    """Возвращает список всех сюжетов"""
 
     def get_plots(self):
         try:
-            self.cursor.execute("""
-                SELECT * FROM plots ORDER BY title
-            """)
+            self.cursor.execute("SELECT * FROM plots ORDER BY title")
             return self.cursor.fetchall()
         except psycopg2.Error as e:
-            self.logger.error(f"Ошибка при получении списка сюжетов: {str(e)}")
+            self.logger.error(f"Ошибка получения списка сюжетов: {str(e)}")
             return []
+
+    """Возвращает список спектаклей, опционально за указанный год"""
 
     def get_performances(self, year=None):
         try:
@@ -275,8 +353,10 @@ class DatabaseManager:
                 """)
             return self.cursor.fetchall()
         except psycopg2.Error as e:
-            self.logger.error(f"Ошибка при получении спектаклей: {str(e)}")
+            self.logger.error(f"Ошибка получения спектаклей: {str(e)}")
             return []
+
+    """Возвращает список актеров, участвующих в указанном спектакле"""
 
     def get_actors_in_performance(self, performance_id):
         try:
@@ -289,16 +369,20 @@ class DatabaseManager:
             """, (performance_id,))
             return self.cursor.fetchall()
         except psycopg2.Error as e:
-            self.logger.error(f"Ошибка при получении актеров в спектакле: {str(e)}")
+            self.logger.error(f"Ошибка получения актеров в спектакле: {str(e)}")
             return []
+
+    """Возвращает текущие игровые данные (год и капитал)"""
 
     def get_game_data(self):
         try:
             self.cursor.execute("SELECT * FROM game_data WHERE id = 1")
             return self.cursor.fetchone()
         except psycopg2.Error as e:
-            self.logger.error(f"Ошибка при получении данных игры: {str(e)}")
+            self.logger.error(f"Ошибка получения игровых данных: {str(e)}")
             return None
+
+    """Обновляет игровые данные (год и капитал)"""
 
     def update_game_data(self, year, capital):
         try:
@@ -308,12 +392,14 @@ class DatabaseManager:
                 WHERE id = 1
             """, (year, capital))
             self.connection.commit()
-            self.logger.info(f"Обновлены данные игры: год={year}, капитал={capital}")
+            self.logger.info(f"Обновлены игровые данные: год={year}, капитал={capital}")
             return True
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при обновлении данных игры: {str(e)}")
+            self.logger.error(f"Ошибка обновления игровых данных: {str(e)}")
             return False
+
+    """Добавляет нового актера"""
 
     def add_actor(self, last_name, first_name, patronymic, rank, awards_count, experience):
         try:
@@ -324,12 +410,14 @@ class DatabaseManager:
             """, (last_name, first_name, patronymic, rank, awards_count, experience))
             actor_id = self.cursor.fetchone()[0]
             self.connection.commit()
-            self.logger.info(f"Добавлен новый актер с ID {actor_id}")
+            self.logger.info(f"Добавлен актер с ID {actor_id}")
             return actor_id
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при добавлении актера: {str(e)}")
+            self.logger.error(f"Ошибка добавления актера: {str(e)}")
             return None
+
+    """Удаляет актера по ID"""
 
     def delete_actor(self, actor_id):
         try:
@@ -341,7 +429,7 @@ class DatabaseManager:
             """, (actor_id,))
 
             if self.cursor.fetchone()[0] > 0:
-                self.logger.error(f"Невозможно удалить актера с ID {actor_id}: он занят в текущих постановках")
+                self.logger.error(f"Актер с ID {actor_id} занят в текущих постановках")
                 return False, "Актер занят в текущих постановках"
 
             # Проверяем, что после удаления останется минимум 8 актеров
@@ -356,8 +444,10 @@ class DatabaseManager:
             return True, ""
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при удалении актера: {str(e)}")
+            self.logger.error(f"Ошибка удаления актера: {str(e)}")
             return False, str(e)
+
+    """Создает новый спектакль"""
 
     def create_performance(self, title, plot_id, year, budget):
         try:
@@ -368,12 +458,14 @@ class DatabaseManager:
             """, (title, plot_id, year, budget))
             performance_id = self.cursor.fetchone()[0]
             self.connection.commit()
-            self.logger.info(f"Создан новый спектакль с ID {performance_id}")
+            self.logger.info(f"Создан спектакль с ID {performance_id}")
             return performance_id
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при создании спектакля: {str(e)}")
+            self.logger.error(f"Ошибка создания спектакля: {str(e)}")
             return None
+
+    """Назначает актера на роль в спектакле"""
 
     def assign_actor_to_role(self, actor_id, performance_id, role, contract_cost):
         try:
@@ -386,8 +478,10 @@ class DatabaseManager:
             return True
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при назначении актера на роль: {str(e)}")
+            self.logger.error(f"Ошибка назначения актера: {str(e)}")
             return False
+
+    """Завершает спектакль с указанной выручкой"""
 
     def complete_performance(self, performance_id, revenue):
         try:
@@ -397,7 +491,7 @@ class DatabaseManager:
                 WHERE performance_id = %s
             """, (revenue, performance_id))
 
-            # Обновляем опыт и, возможно, звания актеров
+            # Обновляем опыт актеров
             self.cursor.execute("""
                 UPDATE actors a
                 SET experience = a.experience + 1
@@ -410,8 +504,27 @@ class DatabaseManager:
             return True
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при завершении спектакля: {str(e)}")
+            self.logger.error(f"Ошибка завершения спектакля: {str(e)}")
             return False
+
+    """Обновляет фактический бюджет спектакля"""
+
+    def update_performance_budget(self, performance_id, budget):
+        try:
+            self.cursor.execute("""
+                UPDATE performances
+                SET budget = %s
+                WHERE performance_id = %s
+            """, (budget, performance_id))
+            self.connection.commit()
+            self.logger.info(f"Обновлен бюджет спектакля {performance_id}: {budget}")
+            return True
+        except psycopg2.Error as e:
+            self.connection.rollback()
+            self.logger.error(f"Ошибка обновления бюджета: {str(e)}")
+            return False
+
+    """Повышает звание актера"""
 
     def upgrade_actor_rank(self, actor_id):
         try:
@@ -438,8 +551,10 @@ class DatabaseManager:
                 return False
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при повышении звания актера: {str(e)}")
+            self.logger.error(f"Ошибка повышения звания: {str(e)}")
             return False
+
+    """Добавляет актеру награду"""
 
     def award_actor(self, actor_id):
         try:
@@ -453,5 +568,5 @@ class DatabaseManager:
             return True
         except psycopg2.Error as e:
             self.connection.rollback()
-            self.logger.error(f"Ошибка при присвоении награды актеру: {str(e)}")
+            self.logger.error(f"Ошибка присвоения награды: {str(e)}")
             return False

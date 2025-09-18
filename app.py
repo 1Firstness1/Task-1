@@ -13,6 +13,11 @@ from controller import TheaterController
 from data import ActorRank
 from logger import Logger
 
+"""
+Главное окно приложения "Театральный менеджер".
+Предоставляет основной интерфейс для взаимодействия с программой.
+"""
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -22,6 +27,9 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Театральный менеджер")
         self.setMinimumSize(900, 600)
+
+        # Устанавливаем стиль для всего приложения
+        self.set_application_style()
 
         # Создаем центральный виджет
         self.central_widget = QWidget()
@@ -37,6 +45,7 @@ class MainWindow(QMainWindow):
         title_font.setPointSize(24)
         title_font.setBold(True)
         title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #2a66c8; margin: 10px;")
         main_layout.addWidget(title_label)
 
         # Информация о текущем состоянии
@@ -55,15 +64,15 @@ class MainWindow(QMainWindow):
         # Кнопки основных действий
         buttons_layout = QHBoxLayout()
 
-        # Кнопка создания схемы БД
-        self.create_schema_btn = QPushButton("Создать схему и таблицы")
-        self.create_schema_btn.clicked.connect(self.create_schema)
-        buttons_layout.addWidget(self.create_schema_btn)
+        # Кнопка сброса данных
+        self.reset_db_btn = QPushButton("Сбросить данные")
+        self.reset_db_btn.clicked.connect(self.reset_database)
+        buttons_layout.addWidget(self.reset_db_btn)
 
         # Кнопка новой постановки
-        self.new_performance_btn = QPushButton("Новая постановка")
-        self.new_performance_btn.clicked.connect(self.new_performance)
-        buttons_layout.addWidget(self.new_performance_btn)
+        self.new_show_btn = QPushButton("Новая постановка")
+        self.new_show_btn.clicked.connect(self.open_new_show_dialog)
+        buttons_layout.addWidget(self.new_show_btn)
 
         # Кнопка просмотра истории
         self.history_btn = QPushButton("История постановок")
@@ -82,6 +91,20 @@ class MainWindow(QMainWindow):
 
         main_layout.addLayout(buttons_layout)
 
+        # Инструкция для пользователя
+        instruction_text = """
+        <h3>Инструкция по использованию:</h3>
+        <p><b>1. Новая постановка</b> - организуйте спектакль, выбрав сюжет и актеров</p>
+        <p><b>2. История постановок</b> - просмотрите результаты прошлых спектаклей</p>
+        <p><b>3. Управление актерами</b> - добавляйте и удаляйте актеров</p>
+        <p><b>4. Пропустить год</b> - продайте права на постановку и получите дополнительные средства</p>
+        <p><b>Цель:</b> Успешно управляйте театром, ставьте прибыльные спектакли и развивайте актеров!</p>
+        """
+        instruction_label = QLabel(instruction_text)
+        instruction_label.setWordWrap(True)
+        instruction_label.setStyleSheet("background-color: #f0f0f0; padding: 15px; border-radius: 5px;")
+        main_layout.addWidget(instruction_label)
+
         # Табличное представление для данных
         self.data_tabs = QTabWidget()
         main_layout.addWidget(self.data_tabs)
@@ -92,8 +115,67 @@ class MainWindow(QMainWindow):
         # Проверяем соединение с базой данных
         self.check_db_connection()
 
+    """Устанавливает стили для приложения"""
+
+    def set_application_style(self):
+        app_style = """
+        QMainWindow, QDialog {
+            background-color: #f5f5f5;
+        }
+        QPushButton {
+            background-color: #4a86e8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            background-color: #3a76d8;
+        }
+        QPushButton:pressed {
+            background-color: #2a66c8;
+        }
+        QLabel {
+            color: #333333;
+        }
+        QTableWidget {
+            border: 1px solid #d0d0d0;
+            gridline-color: #e0e0e0;
+        }
+        QTableWidget::item:selected {
+            background-color: #d0e8ff;
+        }
+        QHeaderView::section {
+            background-color: #e0e0e0;
+            color: #333333;
+            padding: 4px;
+            border: 1px solid #c0c0c0;
+            font-weight: bold;
+        }
+        QTabWidget::pane {
+            border: 1px solid #c0c0c0;
+            background-color: white;
+        }
+        QTabBar::tab {
+            background-color: #e0e0e0;
+            color: #333333;
+            padding: 8px 12px;
+            border: 1px solid #c0c0c0;
+            border-bottom: none;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+        QTabBar::tab:selected {
+            background-color: white;
+            font-weight: bold;
+        }
+        """
+        self.setStyleSheet(app_style)
+
+    """Проверяет подключение к базе данных при запуске"""
+
     def check_db_connection(self):
-        """Проверяет подключение к базе данных при запуске"""
         game_data = self.controller.get_game_state()
         if game_data is None:
             QMessageBox.warning(
@@ -102,85 +184,49 @@ class MainWindow(QMainWindow):
                 "Не удалось подключиться к базе данных. Проверьте параметры подключения и убедитесь, что сервер PostgreSQL запущен."
             )
 
+    """Обновляет информацию о текущем годе и капитале"""
+
     def update_game_info(self):
-        """Обновляет информацию о текущем годе и капитале"""
         game_data = self.controller.get_game_state()
         if game_data:
             self.year_label.setText(f"Текущий год: {game_data['current_year']}")
             self.capital_label.setText(f"Капитал: {game_data['capital']:,} ₽".replace(',', ' '))
 
-    def create_schema(self):
-        """Создает схему базы данных и заполняет начальными данными"""
-        result = self.controller.initialize_database()
-        if result:
-            QMessageBox.information(self, "Успех", "Схема базы данных успешно создана и заполнена начальными данными.")
-            self.update_game_info()
-        else:
-            QMessageBox.critical(self, "Ошибка",
-                                 "Не удалось создать схему базы данных. Проверьте логи для получения подробной информации.")
+    """Сбрасывает базу данных к начальному состоянию"""
 
-    def new_performance(self):
-        """Открывает диалог создания новой постановки"""
+    def reset_database(self):
+        confirm = QMessageBox.question(
+            self,
+            "Подтверждение",
+            "Вы уверены, что хотите сбросить все данные к начальному состоянию?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if confirm == QMessageBox.Yes:
+            result = self.controller.reset_database()
+            if result:
+                QMessageBox.information(self, "Успех", "Данные успешно сброшены к начальному состоянию.")
+                self.update_game_info()
+            else:
+                QMessageBox.critical(self, "Ошибка",
+                                     "Не удалось сбросить данные. Проверьте логи для получения подробной информации.")
+
+    """Открывает диалог создания новой постановки"""
+
+    def open_new_show_dialog(self):
         dialog = NewPerformanceDialog(self.controller, self)
         if dialog.exec():
             self.update_game_info()
 
+    """Показывает историю постановок"""
+
     def show_history(self):
-        """Показывает историю постановок"""
-        self.data_tabs.clear()
+        history_dialog = PerformanceHistoryDialog(self.controller, self)
+        history_dialog.exec()
 
-        # Получаем историю постановок
-        performances = self.controller.get_performances_history()
-
-        if not performances:
-            QMessageBox.information(self, "История", "История постановок пуста.")
-            return
-
-        # Создаем таблицу для истории
-        history_widget = QWidget()
-        history_layout = QVBoxLayout(history_widget)
-
-        history_table = QTableWidget()
-        history_table.setColumnCount(6)
-        history_table.setHorizontalHeaderLabels(["Год", "Название", "Сюжет", "Бюджет", "Сборы", "Прибыль/Убыток"])
-        history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        history_table.setRowCount(len(performances))
-
-        for i, perf in enumerate(performances):
-            year_item = QTableWidgetItem(str(perf['year']))
-            title_item = QTableWidgetItem(perf['title'])
-            plot_item = QTableWidgetItem(perf['plot_title'])
-            budget_item = QTableWidgetItem(f"{perf['budget']:,} ₽".replace(',', ' '))
-            revenue_item = QTableWidgetItem(f"{perf['revenue']:,} ₽".replace(',', ' '))
-
-            profit = perf['revenue'] - perf['budget']
-            profit_item = QTableWidgetItem(f"{profit:,} ₽".replace(',', ' '))
-
-            if profit > 0:
-                profit_item.setForeground(Qt.green)
-            elif profit < 0:
-                profit_item.setForeground(Qt.red)
-
-            history_table.setItem(i, 0, year_item)
-            history_table.setItem(i, 1, title_item)
-            history_table.setItem(i, 2, plot_item)
-            history_table.setItem(i, 3, budget_item)
-            history_table.setItem(i, 4, revenue_item)
-            history_table.setItem(i, 5, profit_item)
-
-        history_table.setSortingEnabled(True)
-        history_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        history_table.cellDoubleClicked.connect(
-            lambda row, col: self.show_performance_details(performances[row]['performance_id']))
-
-        history_layout.addWidget(QLabel("Дважды щелкните по спектаклю для просмотра подробностей"))
-        history_layout.addWidget(history_table)
-
-        self.data_tabs.addTab(history_widget, "История постановок")
-        self.data_tabs.setCurrentIndex(self.data_tabs.count() - 1)
+    """Показывает подробную информацию о спектакле"""
 
     def show_performance_details(self, performance_id):
-        """Показывает подробную информацию о спектакле"""
         details = self.controller.get_performance_details(performance_id)
 
         if not details:
@@ -193,14 +239,16 @@ class MainWindow(QMainWindow):
         dialog = PerformanceDetailsDialog(performance, actors, self)
         dialog.exec()
 
+    """Открывает диалог управления актерами"""
+
     def manage_actors(self):
-        """Открывает диалог управления актерами"""
         dialog = ActorsManagementDialog(self.controller, self)
         if dialog.exec():
             self.update_game_info()
 
+    """Пропускает год"""
+
     def skip_year(self):
-        """Пропускает год"""
         result = QMessageBox.question(
             self,
             "Пропустить год",
@@ -218,10 +266,17 @@ class MainWindow(QMainWindow):
             )
             self.update_game_info()
 
+    """Обработчик закрытия приложения"""
+
     def closeEvent(self, event):
-        """Обработчик закрытия приложения"""
         self.controller.close()
         event.accept()
+
+
+"""
+Диалог создания новой постановки.
+Позволяет выбрать сюжет, установить бюджет и назначить актеров на роли.
+"""
 
 
 class NewPerformanceDialog(QDialog):
@@ -248,7 +303,7 @@ class NewPerformanceDialog(QDialog):
         for plot in self.all_plots:
             self.plot_combo.addItem(f"{plot['title']} (мин. бюджет: {plot['minimum_budget']:,} ₽)".replace(',', ' '),
                                     plot['plot_id'])
-        self.plot_combo.currentIndexChanged.connect(self.update_plot_info)
+        self.plot_combo.currentIndexChanged.connect(self.update_roles_section)
         form_layout.addRow("Сюжет:", self.plot_combo)
 
         self.year_label = QLabel(f"{self.game_data['current_year']}")
@@ -300,11 +355,17 @@ class NewPerformanceDialog(QDialog):
         main_layout.addLayout(buttons_layout)
 
         # Инициализируем информацию о первом сюжете
-        self.update_plot_info(0)
+        self.update_roles_section(0)
         self.update_remaining_budget()
 
-    def update_plot_info(self, index):
-        """Обновляет информацию о выбранном сюжете и создает поля для ролей"""
+    """Рассчитывает стоимость контракта актера на основе его характеристик"""
+
+    def calculate_contract_cost(self, actor):
+        return self.controller.calculate_contract_cost(actor)
+
+    """Создает интерфейс для выбора актеров на роли"""
+
+    def update_roles_section(self, index):
         if index < 0 or not self.all_plots:
             return
 
@@ -335,10 +396,73 @@ class NewPerformanceDialog(QDialog):
         # Создаем список рангов в порядке возрастания
         rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
 
+        # Создаем обработчик для обновления списков актеров
+        def update_actor_lists():
+            # Получаем список уже выбранных актеров
+            selected_actors = set()
+            for i in range(self.roles_layout.count()):
+                role_frame = self.roles_layout.itemAt(i).widget()
+                if role_frame:
+                    for child in role_frame.children():
+                        if isinstance(child, QComboBox):
+                            actor_id = child.currentData()
+                            if actor_id:
+                                selected_actors.add(actor_id)
+
+            # Обновляем списки доступных актеров в каждом комбобоксе
+            for i in range(self.roles_layout.count()):
+                role_frame = self.roles_layout.itemAt(i).widget()
+                if role_frame:
+                    for child in role_frame.children():
+                        if isinstance(child, QComboBox):
+                            current_actor = child.currentData()
+                            child.blockSignals(True)  # Блокируем сигналы во время обновления
+                            current_index = child.currentIndex()
+                            child.clear()
+                            child.addItem("Выберите актера", None)
+
+                            for actor in self.all_actors:
+                                if actor['actor_id'] == current_actor or actor['actor_id'] not in selected_actors:
+                                    actor_name = f"{actor['last_name']} {actor['first_name']} {actor['patronymic']} ({actor['rank']})"
+                                    child.addItem(actor_name, actor['actor_id'])
+
+                                    # Если это текущий актер, выбираем его
+                                    if actor['actor_id'] == current_actor:
+                                        child.setCurrentIndex(child.count() - 1)
+
+                                    # Подсвечиваем актеров, не соответствующих требованиям
+                                    required_ranks = plot['required_ranks'] if 'required_ranks' in plot else []
+                                    role_index = self.roles_layout.indexOf(role_frame)
+
+                                    min_rank = None
+                                    if role_index < len(required_ranks):
+                                        if isinstance(required_ranks, str) and required_ranks.startswith(
+                                                '{') and required_ranks.endswith('}'):
+                                            required_ranks_list = required_ranks[1:-1].split(',')
+                                            min_rank = required_ranks_list[role_index] if role_index < len(
+                                                required_ranks_list) else None
+                                        elif isinstance(required_ranks, list):
+                                            min_rank = required_ranks[role_index]
+
+                                        if min_rank and min_rank.startswith('"') and min_rank.endswith('"'):
+                                            min_rank = min_rank[1:-1]
+
+                                    if min_rank and min_rank in rank_order and actor['rank'] in rank_order:
+                                        if rank_order.index(actor['rank']) < rank_order.index(min_rank):
+                                            idx = child.count() - 1
+                                            child.setItemData(idx, "Не соответствует требованиям звания",
+                                                              Qt.ToolTipRole)
+
+                            child.blockSignals(False)  # Разблокируем сигналы
+
+            # Обновляем оставшийся бюджет
+            self.update_remaining_budget()
+
         # Создаем поля для каждой роли
         for i in range(plot['roles_count']):
             role_frame = QFrame()
             role_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+            role_frame.setProperty("contract_cost", 0)  # Начальная стоимость
             role_layout = QHBoxLayout(role_frame)
 
             role_name = QLineEdit()
@@ -347,50 +471,57 @@ class NewPerformanceDialog(QDialog):
             actor_combo = QComboBox()
             actor_combo.addItem("Выберите актера", None)
 
-            # Добавляем актеров с цветовым выделением по званию
-            required_ranks = plot['required_ranks'] if 'required_ranks' in plot else []
+            # Функция для обновления информации о контракте при выборе актера
+            def create_actor_selected_handler(frame, label):
+                def on_actor_selected(index):
+                    combo = frame.findChild(QComboBox)
+                    actor_id = combo.currentData()
+                    if actor_id:
+                        actor = next((a for a in self.all_actors if a['actor_id'] == actor_id), None)
+                        if actor:
+                            costs = self.calculate_contract_cost(actor)
+                            label.setText(
+                                f"Контракт: {costs['contract']:,} ₽ + "
+                                f"Премия: {costs['premium']:,} ₽ = "
+                                f"Итого: {costs['total']:,} ₽".replace(',', ' ')
+                            )
+                            frame.setProperty("contract_cost", costs['total'])
+                    else:
+                        label.setText("Контракт: — ₽")
+                        frame.setProperty("contract_cost", 0)
 
-            # Минимальное требуемое звание для роли (если указано)
+                    # Обновляем списки доступных актеров
+                    update_actor_lists()
+
+                return on_actor_selected
+
+            # Создаем метку для отображения стоимости контракта
+            contract_label = QLabel("Контракт: — ₽")
+            contract_label.setWordWrap(True)
+
+            # Подключаем обработчик выбора актера
+            actor_combo.currentIndexChanged.connect(create_actor_selected_handler(role_frame, contract_label))
+
+            # Собираем виджеты в layout
+            role_layout.addWidget(QLabel(f"Роль {i + 1}:"))
+            role_layout.addWidget(role_name, 2)
+            role_layout.addWidget(QLabel("Актер:"))
+            role_layout.addWidget(actor_combo, 3)
+            role_layout.addWidget(contract_label, 2)
+
+            # Если есть минимальное звание, отображаем его
+            required_ranks = plot['required_ranks'] if 'required_ranks' in plot else []
             min_rank = None
             if i < len(required_ranks):
-                # Обработка строкового представления массива PostgreSQL
                 if isinstance(required_ranks, str) and required_ranks.startswith('{') and required_ranks.endswith('}'):
-                    # Разбираем строку формата {val1,val2} в список
                     required_ranks_list = required_ranks[1:-1].split(',')
                     min_rank = required_ranks_list[i] if i < len(required_ranks_list) else None
                 elif isinstance(required_ranks, list):
                     min_rank = required_ranks[i]
 
-                # Удаляем кавычки, если они есть
                 if min_rank and min_rank.startswith('"') and min_rank.endswith('"'):
                     min_rank = min_rank[1:-1]
 
-            for actor in self.all_actors:
-                actor_name = f"{actor['last_name']} {actor['first_name']} {actor['patronymic']} ({actor['rank']})"
-                actor_combo.addItem(actor_name, actor['actor_id'])
-
-                # Подсвечиваем актеров, которые не соответствуют требованиям
-                if min_rank and min_rank in rank_order and actor['rank'] in rank_order:
-                    if rank_order.index(actor['rank']) < rank_order.index(min_rank):
-                        idx = actor_combo.count() - 1
-                        actor_combo.setItemData(idx, "Не соответствует требованиям звания", Qt.ToolTipRole)
-
-            # Стоимость контракта
-            contract_spin = QSpinBox()
-            contract_spin.setRange(10000, 1000000)
-            contract_spin.setSingleStep(5000)
-            contract_spin.setValue(50000)
-            contract_spin.setPrefix("₽ ")
-            contract_spin.valueChanged.connect(self.update_remaining_budget)
-
-            role_layout.addWidget(QLabel(f"Роль {i + 1}:"))
-            role_layout.addWidget(role_name, 2)
-            role_layout.addWidget(QLabel("Актер:"))
-            role_layout.addWidget(actor_combo, 3)
-            role_layout.addWidget(QLabel("Контракт:"))
-            role_layout.addWidget(contract_spin, 1)
-
-            # Если есть минимальное звание, отображаем его
             if min_rank and min_rank in rank_order:
                 rank_label = QLabel(f"Мин. звание: {min_rank}")
                 rank_label.setStyleSheet("color: red;")
@@ -398,8 +529,12 @@ class NewPerformanceDialog(QDialog):
 
             self.roles_layout.addWidget(role_frame)
 
+        # Инициализируем список доступных актеров
+        update_actor_lists()
+
+    """Обновляет информацию об оставшемся бюджете"""
+
     def update_remaining_budget(self):
-        """Обновляет информацию об оставшемся бюджете"""
         total_budget = self.budget_spin.value()
 
         # Вычисляем суммарную стоимость контрактов
@@ -407,10 +542,15 @@ class NewPerformanceDialog(QDialog):
         for i in range(self.roles_layout.count()):
             role_frame = self.roles_layout.itemAt(i).widget()
             if role_frame:
-                # Ищем SpinBox стоимости контракта
-                for child in role_frame.children():
-                    if isinstance(child, QSpinBox):
-                        contract_costs += child.value()
+                cost = role_frame.property("contract_cost")
+                if cost:
+                    contract_costs += cost
+
+        # Добавляем стоимость постановки
+        plot_id = self.plot_combo.currentData()
+        plot = next((p for p in self.all_plots if p['plot_id'] == plot_id), None)
+        if plot:
+            contract_costs += plot['production_cost']
 
         remaining = total_budget - contract_costs
 
@@ -420,8 +560,9 @@ class NewPerformanceDialog(QDialog):
         else:
             self.remaining_budget_label.setStyleSheet("")
 
+    """Создает новый спектакль"""
+
     def create_performance(self):
-        """Создает новый спектакль"""
         # Проверяем, что все поля заполнены
         if not self.title_edit.text().strip():
             QMessageBox.warning(self, "Ошибка", "Введите название спектакля")
@@ -461,8 +602,9 @@ class NewPerformanceDialog(QDialog):
                         role_name = child.text().strip()
                     elif isinstance(child, QComboBox):
                         actor_id = child.currentData()
-                    elif isinstance(child, QSpinBox):
-                        contract_cost = child.value()
+
+                # Получаем стоимость контракта из свойства
+                contract_cost = role_frame.property("contract_cost")
 
                 if not role_name:
                     QMessageBox.warning(self, "Ошибка", f"Введите название для роли {i + 1}")
@@ -485,7 +627,8 @@ class NewPerformanceDialog(QDialog):
             return
 
         # Проверяем оставшийся бюджет
-        if int(self.remaining_budget_label.text().replace('₽', '').replace(' ', '').replace(',', '')) < 0:
+        remaining_budget = int(self.remaining_budget_label.text().replace('₽', '').replace(' ', '').replace(',', ''))
+        if remaining_budget < 0:
             QMessageBox.warning(self, "Ошибка", "Превышен бюджет спектакля")
             return
 
@@ -516,9 +659,19 @@ class NewPerformanceDialog(QDialog):
             profit_text = f"{profit:,} ₽".replace(',', ' ')
             profit_color = "green" if profit > 0 else "red"
 
+            # Формируем строку с экономией бюджета, если она есть
+            saved_budget_text = ""
+            if result['saved_budget'] > 0:
+                saved_budget_text = (
+                    f"<p><b>Сэкономлено бюджета:</b> {result['saved_budget']:,} ₽ "
+                    f"(возвращено в капитал)</p>".replace(',', ' ')
+                )
+
             result_text = (
                 f"<h2>Результаты спектакля '{self.title_edit.text()}'</h2>"
-                f"<p><b>Бюджет:</b> {result['budget']:,} ₽</p>"
+                f"<p><b>Изначальный бюджет:</b> {result['original_budget']:,} ₽</p>"
+                f"<p><b>Фактический бюджет:</b> {result['budget']:,} ₽</p>"
+                f"{saved_budget_text}"
                 f"<p><b>Сборы:</b> {result['revenue']:,} ₽</p>"
                 f"<p><b>Прибыль/Убыток:</b> <span style='color:{profit_color}'>{profit_text}</span></p>"
             )
@@ -534,6 +687,12 @@ class NewPerformanceDialog(QDialog):
             self.accept()
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось рассчитать результаты спектакля")
+
+
+"""
+Диалог с подробной информацией о спектакле.
+Отображает информацию о спектакле и списке актеров.
+"""
 
 
 class PerformanceDetailsDialog(QDialog):
@@ -559,7 +718,7 @@ class PerformanceDetailsDialog(QDialog):
         layout.addWidget(QLabel("<h3>Актеры в спектакле:</h3>"))
 
         actors_table = QTableWidget()
-        actors_table.setColumnCount(5)
+        actors_table.setColumnCount(6)
         actors_table.setHorizontalHeaderLabels(["ФИО", "Звание", "Опыт", "Награды", "Роль", "Гонорар"])
         actors_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         actors_table.setRowCount(len(actors))
@@ -579,7 +738,6 @@ class PerformanceDetailsDialog(QDialog):
             actors_table.setItem(i, 4, role_item)
             actors_table.setItem(i, 5, contract_item)
 
-        actors_table.setSortingEnabled(True)
         actors_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
         layout.addWidget(actors_table)
@@ -588,6 +746,93 @@ class PerformanceDetailsDialog(QDialog):
         close_btn = QPushButton("Закрыть")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
+
+
+"""
+Диалог истории постановок.
+Отображает список всех прошедших спектаклей.
+"""
+
+
+class PerformanceHistoryDialog(QDialog):
+    def __init__(self, controller, parent=None):
+        super().__init__(parent)
+        self.controller = controller
+        self.parent_window = parent
+
+        self.setWindowTitle("История постановок")
+        self.setMinimumSize(800, 500)
+
+        layout = QVBoxLayout(self)
+
+        # Заголовок
+        title_label = QLabel("<h2>История постановок</h2>")
+        title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title_label)
+
+        # Получаем историю постановок
+        self.performances = controller.get_performances_history()
+
+        if not self.performances:
+            empty_label = QLabel("История постановок пуста.")
+            empty_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(empty_label)
+        else:
+            # Создаем таблицу
+            self.history_table = QTableWidget()
+            self.history_table.setColumnCount(6)
+            self.history_table.setHorizontalHeaderLabels(
+                ["Год", "Название", "Сюжет", "Бюджет", "Сборы", "Прибыль/Убыток"])
+            self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.history_table.setRowCount(len(self.performances))
+
+            for i, perf in enumerate(self.performances):
+                year_item = QTableWidgetItem(str(perf['year']))
+                title_item = QTableWidgetItem(perf['title'])
+                plot_item = QTableWidgetItem(perf['plot_title'])
+                budget_item = QTableWidgetItem(f"{perf['budget']:,} ₽".replace(',', ' '))
+                revenue_item = QTableWidgetItem(f"{perf['revenue']:,} ₽".replace(',', ' '))
+
+                profit = perf['revenue'] - perf['budget']
+                profit_item = QTableWidgetItem(f"{profit:,} ₽".replace(',', ' '))
+
+                if profit > 0:
+                    profit_item.setForeground(Qt.green)
+                elif profit < 0:
+                    profit_item.setForeground(Qt.red)
+
+                self.history_table.setItem(i, 0, year_item)
+                self.history_table.setItem(i, 1, title_item)
+                self.history_table.setItem(i, 2, plot_item)
+                self.history_table.setItem(i, 3, budget_item)
+                self.history_table.setItem(i, 4, revenue_item)
+                self.history_table.setItem(i, 5, profit_item)
+
+            self.history_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.history_table.cellDoubleClicked.connect(self.show_performance_details)
+
+            instruction_label = QLabel("Дважды щелкните по спектаклю для просмотра подробностей")
+            instruction_label.setAlignment(Qt.AlignCenter)
+
+            layout.addWidget(instruction_label)
+            layout.addWidget(self.history_table)
+
+        # Кнопка закрытия
+        close_btn = QPushButton("Закрыть")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+
+    """Показывает подробности выбранного спектакля"""
+
+    def show_performance_details(self, row, col):
+        perf_id = self.performances[row]['performance_id']
+        self.parent_window.show_performance_details(perf_id)
+
+
+"""
+Диалог управления актерами.
+Позволяет просматривать, добавлять и удалять актеров.
+"""
 
 
 class ActorsManagementDialog(QDialog):
@@ -634,8 +879,9 @@ class ActorsManagementDialog(QDialog):
 
         layout.addLayout(buttons_layout)
 
+    """Обновляет таблицу актеров"""
+
     def update_actors_table(self):
-        """Обновляет таблицу актеров"""
         self.all_actors = self.controller.get_all_actors()
         self.actors_table.setRowCount(len(self.all_actors))
 
@@ -656,8 +902,9 @@ class ActorsManagementDialog(QDialog):
             self.actors_table.setItem(i, 5, exp_item)
             self.actors_table.setItem(i, 6, awards_item)
 
+    """Открывает диалог добавления актера"""
+
     def add_actor(self):
-        """Открывает диалог добавления актера"""
         dialog = AddActorDialog(self)
         if dialog.exec():
             last_name = dialog.last_name_edit.text().strip()
@@ -675,8 +922,9 @@ class ActorsManagementDialog(QDialog):
             else:
                 QMessageBox.warning(self, "Ошибка", "Не удалось добавить актера.")
 
+    """Удаляет выбранного актера"""
+
     def delete_actor(self):
-        """Удаляет выбранного актера"""
         selected_rows = self.actors_table.selectedItems()
         if not selected_rows:
             QMessageBox.warning(self, "Ошибка", "Выберите актера для удаления.")
@@ -703,6 +951,12 @@ class ActorsManagementDialog(QDialog):
                 QMessageBox.warning(self, "Ошибка", f"Не удалось удалить актера: {message}")
 
 
+"""
+Диалог добавления нового актера.
+Позволяет ввести данные нового актера.
+"""
+
+
 class AddActorDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -722,8 +976,9 @@ class AddActorDialog(QDialog):
         layout.addRow("Отчество:", self.patronymic_edit)
 
         self.rank_combo = QComboBox()
-        for rank in ActorRank:
-            self.rank_combo.addItem(rank.value)
+        rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
+        for rank in rank_order:
+            self.rank_combo.addItem(rank)
         layout.addRow("Звание:", self.rank_combo)
 
         self.awards_spin = QSpinBox()
@@ -747,8 +1002,9 @@ class AddActorDialog(QDialog):
 
         layout.addRow("", buttons_layout)
 
+    """Проверяет введенные данные и закрывает диалог"""
+
     def validate_and_accept(self):
-        """Проверяет введенные данные и закрывает диалог"""
         if not self.last_name_edit.text().strip():
             QMessageBox.warning(self, "Ошибка", "Введите фамилию")
             return

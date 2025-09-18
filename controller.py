@@ -2,6 +2,11 @@ import random
 from data import DatabaseManager, ActorRank
 from logger import Logger
 
+"""
+Контроллер для управления бизнес-логикой театра.
+Обеспечивает связь между интерфейсом и базой данных.
+"""
+
 
 class TheaterController:
     def __init__(self):
@@ -9,30 +14,41 @@ class TheaterController:
         self.logger = Logger()
         self.db.connect()
 
+    """Инициализирует базу данных и заполняет её начальными данными"""
+
     def initialize_database(self):
-        """Инициализирует базу данных и заполняет её начальными данными"""
         result1 = self.db.create_schema()
         result2 = self.db.init_sample_data()
         return result1 and result2
 
+    """Сбрасывает базу данных к начальному состоянию"""
+
+    def reset_database(self):
+        return self.db.reset_database()
+
+    """Возвращает текущее состояние игры (год и капитал)"""
+
     def get_game_state(self):
-        """Возвращает текущее состояние игры (год и капитал)"""
         return self.db.get_game_data()
 
+    """Возвращает список всех актеров"""
+
     def get_all_actors(self):
-        """Возвращает список всех актеров"""
         return self.db.get_actors()
 
+    """Возвращает список всех доступных сюжетов"""
+
     def get_all_plots(self):
-        """Возвращает список всех доступных сюжетов"""
         return self.db.get_plots()
 
+    """Возвращает историю спектаклей"""
+
     def get_performances_history(self):
-        """Возвращает историю спектаклей"""
         return self.db.get_performances()
 
+    """Возвращает детали конкретного спектакля, включая актеров"""
+
     def get_performance_details(self, performance_id):
-        """Возвращает детали конкретного спектакля, включая актеров"""
         # Получаем данные о спектакле
         performances = self.db.get_performances()
         performance = next((p for p in performances if p['performance_id'] == performance_id), None)
@@ -48,8 +64,9 @@ class TheaterController:
             'actors': actors
         }
 
+    """Создает новый спектакль"""
+
     def create_new_performance(self, title, plot_id, year, budget):
-        """Создает новый спектакль"""
         # Проверяем достаточно ли денег в капитале
         game_data = self.db.get_game_data()
         if game_data['capital'] < budget:
@@ -76,12 +93,40 @@ class TheaterController:
         else:
             return False, "Ошибка при создании спектакля"
 
+    """Назначает актера на роль в спектакле"""
+
     def assign_actor_to_performance(self, actor_id, performance_id, role, contract_cost):
-        """Назначает актера на роль в спектакле"""
         return self.db.assign_actor_to_role(actor_id, performance_id, role, contract_cost)
 
+    """Рассчитывает стоимость контракта для актера"""
+
+    def calculate_contract_cost(self, actor):
+        # Базовая стоимость
+        base_cost = 30000
+
+        # Бонус за звание
+        rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
+        rank_bonus = rank_order.index(actor['rank']) * 10000
+
+        # Бонус за стаж и награды
+        experience_bonus = actor['experience'] * 2000
+        awards_bonus = actor['awards_count'] * 5000
+
+        # Итоговая стоимость
+        contract_cost = base_cost + rank_bonus + experience_bonus + awards_bonus
+
+        # Премия (1/5 от контракта)
+        premium = contract_cost / 5
+
+        return {
+            'contract': contract_cost,
+            'premium': premium,
+            'total': contract_cost + premium
+        }
+
+    """Рассчитывает результаты спектакля (выручку и прибыль)"""
+
     def calculate_performance_result(self, performance_id):
-        """Рассчитывает результаты спектакля (выручку и прибыль)"""
         # Получаем данные о спектакле
         performances = self.db.get_performances()
         performance = next((p for p in performances if p['performance_id'] == performance_id), None)
@@ -96,15 +141,24 @@ class TheaterController:
         # Получаем актеров в спектакле
         actors = self.db.get_actors_in_performance(performance_id)
 
+        # Вычисляем фактически потраченную сумму
+        total_spent = plot['production_cost']  # Стоимость постановки
+        for actor in actors:
+            total_spent += actor['contract_cost']
+
+        # Если потрачено меньше бюджета, возвращаем разницу в капитал
+        actual_budget = min(performance['budget'], total_spent)
+        saved_budget = performance['budget'] - actual_budget
+
         # Базовая выручка зависит от бюджета и спроса на сюжет
-        base_revenue = performance['budget'] * (0.8 + 0.1 * plot['demand'])
+        base_revenue = actual_budget * (0.8 + 0.1 * plot['demand'])
 
         # Бонус от актеров (зависит от их званий, наград и опыта)
         actors_bonus = 0
         for actor in actors:
             # Чем выше звание, тем больше бонус
-            rank_value = list(ActorRank).index(ActorRank(actor['rank']))
-            rank_multiplier = 1 + (rank_value * 0.1)
+            rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
+            rank_multiplier = 1 + (rank_order.index(actor['rank']) * 0.1)
 
             # Бонус от наград и опыта
             award_bonus = actor['awards_count'] * 0.05
@@ -120,14 +174,17 @@ class TheaterController:
         total_revenue = int((base_revenue + actors_bonus) * random_factor)
 
         # Прибыль
-        profit = total_revenue - performance['budget']
+        profit = total_revenue - actual_budget
+
+        # Обновляем данные с учетом фактического бюджета
+        self.db.update_performance_budget(performance_id, actual_budget)
 
         # Завершаем спектакль и обновляем данные
         self.db.complete_performance(performance_id, total_revenue)
 
         # Обновляем капитал
         game_data = self.db.get_game_data()
-        new_capital = game_data['capital'] + profit
+        new_capital = game_data['capital'] + profit + saved_budget
         current_year = game_data['current_year'] + 1
         self.db.update_game_data(current_year, new_capital)
 
@@ -135,8 +192,9 @@ class TheaterController:
         successful_actors = []
         if profit > 0:
             # Сортируем актеров по вкладу в успех (звание, опыт, награды)
+            rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
             sorted_actors = sorted(actors,
-                                   key=lambda a: (list(ActorRank).index(ActorRank(a['rank'])),
+                                   key=lambda a: (rank_order.index(a['rank']),
                                                   a['experience'],
                                                   a['awards_count']),
                                    reverse=True)
@@ -147,18 +205,21 @@ class TheaterController:
                 successful_actors.append(actor)
 
                 # Повышаем звание, если актер был особенно успешен
-                if i == 0 and profit > performance['budget'] * 0.5:
+                if i == 0 and profit > actual_budget * 0.5:
                     self.db.upgrade_actor_rank(actor['actor_id'])
 
         return True, {
             'revenue': total_revenue,
-            'budget': performance['budget'],
+            'budget': actual_budget,
+            'original_budget': performance['budget'],
+            'saved_budget': saved_budget,
             'profit': profit,
             'awarded_actors': successful_actors
         }
 
+    """Пропускает год и добавляет случайную сумму к капиталу за продажу прав"""
+
     def skip_year(self):
-        """Пропускает год и добавляет случайную сумму к капиталу за продажу прав"""
         game_data = self.db.get_game_data()
         current_year = game_data['current_year']
         current_capital = game_data['capital']
@@ -178,14 +239,17 @@ class TheaterController:
             'rights_sale': rights_sale
         }
 
+    """Добавляет нового актера"""
+
     def add_new_actor(self, last_name, first_name, patronymic, rank, awards_count, experience):
-        """Добавляет нового актера"""
         return self.db.add_actor(last_name, first_name, patronymic, rank, awards_count, experience)
 
+    """Удаляет актера по ID"""
+
     def delete_actor_by_id(self, actor_id):
-        """Удаляет актера по ID"""
         return self.db.delete_actor(actor_id)
 
+    """Закрывает соединение с базой данных"""
+
     def close(self):
-        """Закрывает соединение с базой данных"""
         self.db.disconnect()

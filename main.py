@@ -8,7 +8,7 @@ if __name__ == "__main__":
     logger = Logger()
     logger.info("Запуск приложения")
 
-    # Создаем QApplication
+    # Создаем приложение
     app = QApplication(sys.argv)
     app.setApplicationName("Театральный менеджер")
 
