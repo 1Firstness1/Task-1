@@ -35,16 +35,8 @@ class LoginDialog(QDialog):
         title_font.setPointSize(18)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #2a66c8; margin: 10px;")
+        title_label.setStyleSheet("color: #2a66c8; ")
         layout.addWidget(title_label)
-
-        subtitle_label = QLabel("Подключение к базе данных")
-        subtitle_label.setAlignment(Qt.AlignCenter)
-        subtitle_font = QFont()
-        subtitle_font.setPointSize(14)
-        subtitle_label.setFont(subtitle_font)
-        subtitle_label.setStyleSheet("color: #333333;")
-        layout.addWidget(subtitle_label)
 
         form_layout = QFormLayout()
 
@@ -62,7 +54,6 @@ class LoginDialog(QDialog):
         self.host_edit = QLineEdit("localhost")
         self.host_edit.setStyleSheet("color: black;")
         host_label = QLabel("Хост:")
-        dbname_label.setStyleSheet("color: #333333")
         host_label.setStyleSheet(form_label_style)
         form_layout.addRow(host_label, self.host_edit)
 
@@ -72,13 +63,13 @@ class LoginDialog(QDialog):
         port_label.setStyleSheet(form_label_style)
         form_layout.addRow(port_label, self.port_edit)
 
-        self.user_edit = QLineEdit("artem")
+        self.user_edit = QLineEdit("postgres")
         self.user_edit.setStyleSheet("color: black;")
         user_label = QLabel("Пользователь:")
         user_label.setStyleSheet(form_label_style)
         form_layout.addRow(user_label, self.user_edit)
 
-        self.password_edit = QLineEdit()
+        self.password_edit = QLineEdit("root")
         self.password_edit.setEchoMode(QLineEdit.Password)
         self.password_edit.setStyleSheet("color: black;")
         password_label = QLabel("Пароль:")
@@ -354,7 +345,7 @@ class MainWindow(QMainWindow):
             log_content = f.read()
             self.log_display.setText(log_content)
 
-        self.logger._main_window_log_display = self.log_display
+        self.logger.set_main_window_log_display(self.log_display)
 
         self.logger.info("Главное окно инициализировано")
 
