@@ -545,8 +545,6 @@ class NewPerformanceDialog(QDialog):
         self.setWindowTitle("Новая постановка")
         self.setMinimumSize(800, 600)
 
-        self.setStyleSheet("background-color: #f5f5f5;")
-
         main_layout = QVBoxLayout(self)
 
         form_layout = QFormLayout()
@@ -702,20 +700,15 @@ class NewPerformanceDialog(QDialog):
             role_frame = QFrame()
             role_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
             role_frame.setProperty("contract_cost", 0)
-
-            role_frame.setStyleSheet("background-color: #3a76d8; border-radius: 5px;")
             role_layout = QHBoxLayout(role_frame)
 
             role_name = QLineEdit()
             role_name.setPlaceholderText(f"Роль {i + 1}")
             role_name.setMinimumWidth(180)
-
-            role_name.setStyleSheet("background-color: white; color: black;")
+            role_name.setStyleSheet("color: black;")
 
             actor_combo = QComboBox()
             actor_combo.addItem("Выберите актера", None)
-
-            actor_combo.setStyleSheet("background-color: white; color: black;")
 
             def create_actor_selected_handler(frame, label):
                 def on_actor_selected(index):
@@ -741,7 +734,6 @@ class NewPerformanceDialog(QDialog):
 
             contract_label = QLabel("<b>Контракт:</b> — ₽")
             contract_label.setWordWrap(True)
-
             contract_label.setStyleSheet("color: white;")
 
             actor_combo.currentIndexChanged.connect(create_actor_selected_handler(role_frame, contract_label))
@@ -771,7 +763,7 @@ class NewPerformanceDialog(QDialog):
 
             if min_rank and min_rank in rank_order:
                 rank_label = QLabel(f"Мин. звание: {min_rank}")
-                rank_label.setStyleSheet("color: white; font-weight: bold;")
+                rank_label.setStyleSheet("color: red; font-weight: bold;")
                 role_layout.addWidget(rank_label)
 
             self.roles_layout.addWidget(role_frame)
@@ -922,8 +914,6 @@ class PerformanceDetailsDialog(QDialog):
         self.setWindowTitle(f"Детали спектакля '{performance['title']}'")
         self.setMinimumSize(600, 400)
 
-        self.setStyleSheet("background-color: #f5f5f5;")
-
         layout = QVBoxLayout(self)
 
         performance_info = QLabel(
@@ -974,10 +964,8 @@ class PerformanceHistoryDialog(QDialog):
         self.controller = controller
         self.parent_window = parent
 
-        self.setWindowTitle("История постановок")
+        self.setWindowTitle("Постановок")
         self.setMinimumSize(800, 500)
-
-        self.setStyleSheet("background-color: #f5f5f5;")
 
         layout = QVBoxLayout(self)
 
@@ -1059,11 +1047,9 @@ class ActorsManagementDialog(QDialog):
         self.setWindowTitle("Управление актерами")
         self.setMinimumSize(800, 600)
 
-        self.setStyleSheet("background-color: #f5f5f5;")
-
         layout = QVBoxLayout(self)
 
-        title_label = QLabel("<h2>Управление актерами</h2>")
+        title_label = QLabel("<h2>Актёры</h2>")
         title_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(title_label)
 
@@ -1162,8 +1148,6 @@ class AddActorDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Добавить актера")
         self.setMinimumWidth(400)
-
-        self.setStyleSheet("background-color: #f5f5f5;")
 
         layout = QFormLayout(self)
 
