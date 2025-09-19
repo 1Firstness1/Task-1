@@ -150,7 +150,12 @@ class LoginDialog(QDialog):
         password = self.password_edit.text()
 
         if not dbname or not host or not port or not user:
-            QMessageBox.warning(self, "Ошибка", "Все поля, кроме пароля, должны быть заполнены")
+            warn_box = QMessageBox(self)
+            warn_box.setWindowTitle("Ошибка")
+            warn_box.setText("Все поля, кроме пароля, должны быть заполнены")
+            warn_box.setIcon(QMessageBox.Warning)
+            warn_box.setStyleSheet("QLabel { color: black; } QPushButton { color: black; }")
+            warn_box.exec()
             return
 
         self.controller.set_connection_params(dbname, user, password, host, port)
@@ -316,11 +321,12 @@ class MainWindow(QMainWindow):
 
         instruction_text = """
         <h3>Инструкция по использованию:</h3>
-        <p><b>1. Новая постановка</b> - организуйте спектакль, выбрав сюжет и актеров</p>
-        <p><b>2. История постановок</b> - просмотрите результаты прошлых спектаклей</p>
-        <p><b>3. Управление актерами</b> - добавляйте и удаляйте актеров</p>
-        <p><b>4. Пропустить год</b> - продайте права на постановку и получите дополнительные средства</p>
-        <p><b>Цель:</b> Успешно управляйте театром, ставьте прибыльные спектакли и развивайте актеров!</p>
+        <p><b>1. Обновить данные</b> - обновляйте текущие данные в таблицах на стартовые</p>
+        <p><b>2. Обновить Схему</b> - обновляйте текущую схему в базе на новую</p>
+        <p><b>3. Новая постановка</b> - организуйте спектакль, выбрав сюжет и актеров</p>
+        <p><b>4. История постановок</b> - просмотрите результаты прошлых спектаклей</p>
+        <p><b>5. Управление актерами</b> - добавляйте и удаляйте актеров</p>
+        <p><b>6. Пропустить год</b> - продайте права на постановку и получите дополнительные средства</p>
         """
         instruction_label = QLabel(instruction_text)
         instruction_label.setWordWrap(True)
@@ -335,7 +341,7 @@ class MainWindow(QMainWindow):
 
         self.log_display = QTextEdit()
         self.log_display.setReadOnly(True)
-        self.log_display.setStyleSheet("background-color: white; color: black; font-family: monospace;")
+        self.log_display.setStyleSheet("background-color: white; color: black; ")
         log_layout.addWidget(self.log_display)
 
         self.data_tabs.addTab(log_tab, "Логи")
