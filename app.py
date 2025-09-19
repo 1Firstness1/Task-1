@@ -788,7 +788,8 @@ class NewPerformanceDialog(QDialog):
 
         remaining = total_budget - contract_costs
 
-        self.remaining_budget_label.setText(f"{remaining:,} ₽".replace(',', ' '))
+        self.remaining_budget_label.setText(f"{int(remaining):,} ₽".replace(',', ' '))
+
         if remaining < 0:
             self.remaining_budget_label.setStyleSheet("color: red; font-weight: bold;")
         else:
@@ -852,7 +853,13 @@ class NewPerformanceDialog(QDialog):
             QMessageBox.warning(self, "Ошибка", f"Необходимо заполнить все {plot['roles_count']} ролей")
             return
 
-        remaining_budget = int(self.remaining_budget_label.text().replace('₽', '').replace(' ', '').replace(',', ''))
+        remaining_budget_text = self.remaining_budget_label.text().replace('₽', '').replace(' ', '').replace(',', '')
+        try:
+            remaining_budget = int(float(remaining_budget_text))
+        except ValueError:
+            QMessageBox.warning(self, "Ошибка", "Некорректное значение оставшегося бюджета")
+            return
+
         if remaining_budget < 0:
             QMessageBox.warning(self, "Ошибка", "Превышен бюджет спектакля")
             return

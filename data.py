@@ -341,7 +341,8 @@ class DatabaseManager:
             self.connection.commit()
             self.logger.info("Схема БД успешно удалена")
 
-            success = self.create_schema() and self.init_sample_data()
+            success = self.create_schema()
+
             return success
         except psycopg2.Error as e:
             self.connection.rollback()
