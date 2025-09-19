@@ -1,9 +1,6 @@
 import psycopg2
 from logger import Logger
 
-"""Тестирует подключение к базе данных и возвращает результат"""
-
-
 def test_db_connection(dbname="task1", user="postgres", password="postgres", host="localhost", port="5432"):
     logger = Logger()
     try:
@@ -17,7 +14,6 @@ def test_db_connection(dbname="task1", user="postgres", password="postgres", hos
         cursor = connection.cursor()
         logger.info(f"Успешное подключение к базе данных {dbname}")
 
-        # Проверяем версию PostgreSQL
         cursor.execute("SELECT version();")
         version = cursor.fetchone()[0]
         logger.info(f"Версия PostgreSQL: {version}")

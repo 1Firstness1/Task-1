@@ -5,11 +5,6 @@ import enum
 from datetime import datetime
 from logger import Logger
 
-"""
-Перечисление возможных званий актеров в порядке возрастания
-"""
-
-
 class ActorRank(enum.Enum):
     BEGINNER = "Начинающий"
     REGULAR = "Постоянный"
@@ -18,16 +13,12 @@ class ActorRank(enum.Enum):
     HONORED = "Заслуженный"
     PEOPLE = "Народный"
 
-    """Получает элемент перечисления по значению"""
-
     @classmethod
     def from_value(cls, value):
         for member in cls:
             if member.value == value:
                 return member
         raise ValueError(f"'{value}' не является допустимым званием актера")
-
-    """Сравнивает два звания, возвращая -1, 0 или 1"""
 
     @classmethod
     def compare(cls, rank1, rank2):
@@ -43,13 +34,6 @@ class ActorRank(enum.Enum):
 
         return -1 if idx1 < idx2 else 1
 
-
-"""
-Класс для работы с базой данных PostgreSQL.
-Обеспечивает все операции с данными театра.
-"""
-
-
 class DatabaseManager:
     def __init__(self, dbname="task1", user="artem", password="", host="localhost", port="5432"):
         self.connection_params = {
@@ -63,8 +47,6 @@ class DatabaseManager:
         self.connection = None
         self.cursor = None
 
-    """Устанавливает соединение с базой данных"""
-
     def connect(self):
         try:
             self.connection = psycopg2.connect(**self.connection_params)
@@ -75,8 +57,6 @@ class DatabaseManager:
             self.logger.error(f"Ошибка подключения к БД: {str(e)}")
             return False
 
-    """Закрывает соединение с базой данных"""
-
     def disconnect(self):
         if self.cursor:
             self.cursor.close()
@@ -84,11 +64,8 @@ class DatabaseManager:
             self.connection.close()
             self.logger.info("Соединение с БД закрыто")
 
-    """Создает схему базы данных"""
-
     def create_schema(self):
         try:
-            # Создаем перечисление для звания актера
             self.cursor.execute("""
                 DO $$
                 BEGIN
@@ -100,7 +77,6 @@ class DatabaseManager:
                 END$$;
             """)
 
-            # Создаем таблицу Актеры
             self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS actors (
                     actor_id SERIAL PRIMARY KEY,
@@ -114,7 +90,6 @@ class DatabaseManager:
                 );
             """)
 
-            # Создаем таблицу Сюжеты
             self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS plots (
                     plot_id SERIAL PRIMARY KEY,
@@ -127,7 +102,6 @@ class DatabaseManager:
                 );
             """)
 
-            # Создаем таблицу Спектакли
             self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS performances (
                     performance_id SERIAL PRIMARY KEY,
@@ -142,7 +116,6 @@ class DatabaseManager:
                 );
             """)
 
-            # Создаем таблицу Занятость актеров
             self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS actor_performances (
                     actor_id INTEGER NOT NULL,
@@ -155,7 +128,6 @@ class DatabaseManager:
                 );
             """)
 
-            # Создаем таблицу Данные
             self.cursor.execute("""
                 CREATE TABLE IF NOT EXISTS game_data (
                     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
@@ -163,7 +135,6 @@ class DatabaseManager:
                     capital BIGINT NOT NULL DEFAULT 1000000 CHECK (capital >= 0)
                 );
 
-                -- Вставляем начальные данные, если таблица пуста
                 INSERT INTO game_data (id, current_year, capital)
                 SELECT 1, 2025, 1000000
                 WHERE NOT EXISTS (SELECT 1 FROM game_data WHERE id = 1);
@@ -177,20 +148,15 @@ class DatabaseManager:
             self.logger.error(f"Ошибка создания схемы БД: {str(e)}")
             return False
 
-    """Заполняет базу данных тестовыми данными"""
-
     def init_sample_data(self):
         try:
-            # Проверяем, есть ли запись в game_data
             self.cursor.execute("SELECT COUNT(*) FROM game_data")
             if self.cursor.fetchone()[0] == 0:
-                # Если нет, добавляем начальные данные
                 self.cursor.execute("""
                     INSERT INTO game_data (id, current_year, capital)
                     VALUES (1, 2025, 1000000)
                 """)
 
-            # Добавляем начальных актеров
             actors = [
                 ('Иванов', 'Иван', 'Иванович', 'Ведущий', 3, 5),
                 ('Петров', 'Петр', 'Петрович', 'Заслуженный', 5, 10),
@@ -211,7 +177,6 @@ class DatabaseManager:
                     ON CONFLICT (last_name, first_name, patronymic) DO NOTHING
                 """, actor)
 
-            # Добавляем сюжеты
             plots = [
                 ('Ромео и Джульетта', 500000, 350000, 6, 8, ['Ведущий', 'Мастер']),
                 ('Гамлет', 800000, 500000, 8, 9, ['Мастер', 'Заслуженный']),
@@ -232,7 +197,6 @@ class DatabaseManager:
                     ON CONFLICT (title) DO NOTHING
                 """, plot)
 
-            # Добавляем прошедшие спектакли (2022-2024)
             past_performances = [
                 ('Ромео и Джульетта в современном мире', 1, 2022, 600000, 950000, True),
                 ('Гамлет: Перезагрузка', 2, 2023, 850000, 1200000, True),
@@ -246,9 +210,7 @@ class DatabaseManager:
                     ON CONFLICT (year) DO NOTHING
                 """, perf)
 
-            # Добавляем актеров в прошедшие спектакли
             actor_perfs = [
-                # 2022: Ромео и Джульетта
                 (1, 1, 'Ромео', 100000),
                 (5, 1, 'Джульетта', 90000),
                 (8, 1, 'Меркуцио', 80000),
@@ -256,7 +218,6 @@ class DatabaseManager:
                 (7, 1, 'Кормилица', 60000),
                 (6, 1, 'Бенволио', 50000),
 
-                # 2023: Гамлет
                 (2, 2, 'Гамлет', 150000),
                 (9, 2, 'Офелия', 120000),
                 (8, 2, 'Клавдий', 110000),
@@ -266,7 +227,6 @@ class DatabaseManager:
                 (1, 2, 'Лаэрт', 80000),
                 (5, 2, 'Розенкранц', 70000),
 
-                # 2024: Чайка
                 (3, 3, 'Нина Заречная', 130000),
                 (2, 3, 'Константин Треплев', 120000),
                 (9, 3, 'Ирина Аркадина', 110000),
@@ -289,29 +249,23 @@ class DatabaseManager:
             self.logger.error(f"Ошибка добавления тестовых данных: {str(e)}")
             return False
 
-    """Сбрасывает базу данных к начальному состоянию"""
-
     def reset_database(self):
         try:
-            # Очищаем таблицы
             self.cursor.execute("TRUNCATE TABLE actor_performances CASCADE")
             self.cursor.execute("TRUNCATE TABLE performances CASCADE")
             self.cursor.execute("TRUNCATE TABLE actors CASCADE")
             self.cursor.execute("TRUNCATE TABLE plots CASCADE")
             self.cursor.execute("TRUNCATE TABLE game_data CASCADE")
 
-            # Сбрасываем последовательности автоинкремента
             self.cursor.execute("ALTER SEQUENCE actors_actor_id_seq RESTART WITH 1")
             self.cursor.execute("ALTER SEQUENCE plots_plot_id_seq RESTART WITH 1")
             self.cursor.execute("ALTER SEQUENCE performances_performance_id_seq RESTART WITH 1")
 
-            # Вставляем начальные данные игры
             self.cursor.execute("""
                 INSERT INTO game_data (id, current_year, capital)
                 VALUES (1, 2025, 1000000)
             """)
 
-            # Инициализируем остальные данные
             self.init_sample_data()
 
             self.connection.commit()
@@ -322,8 +276,6 @@ class DatabaseManager:
             self.logger.error(f"Ошибка сброса БД: {str(e)}")
             return False
 
-    """Возвращает список всех актеров"""
-
     def get_actors(self):
         try:
             self.cursor.execute("SELECT * FROM actors ORDER BY last_name, first_name")
@@ -332,8 +284,6 @@ class DatabaseManager:
             self.logger.error(f"Ошибка получения списка актеров: {str(e)}")
             return []
 
-    """Возвращает список всех сюжетов"""
-
     def get_plots(self):
         try:
             self.cursor.execute("SELECT * FROM plots ORDER BY title")
@@ -341,8 +291,6 @@ class DatabaseManager:
         except psycopg2.Error as e:
             self.logger.error(f"Ошибка получения списка сюжетов: {str(e)}")
             return []
-
-    """Возвращает список спектаклей, опционально за указанный год"""
 
     def get_performances(self, year=None):
         try:
@@ -365,8 +313,6 @@ class DatabaseManager:
             self.logger.error(f"Ошибка получения спектаклей: {str(e)}")
             return []
 
-    """Возвращает список актеров, участвующих в указанном спектакле"""
-
     def get_actors_in_performance(self, performance_id):
         try:
             self.cursor.execute("""
@@ -381,8 +327,6 @@ class DatabaseManager:
             self.logger.error(f"Ошибка получения актеров в спектакле: {str(e)}")
             return []
 
-    """Возвращает текущие игровые данные (год и капитал)"""
-
     def get_game_data(self):
         try:
             self.cursor.execute("SELECT * FROM game_data WHERE id = 1")
@@ -390,8 +334,6 @@ class DatabaseManager:
         except psycopg2.Error as e:
             self.logger.error(f"Ошибка получения игровых данных: {str(e)}")
             return None
-
-    """Обновляет игровые данные (год и капитал)"""
 
     def update_game_data(self, year, capital):
         try:
@@ -407,8 +349,6 @@ class DatabaseManager:
             self.connection.rollback()
             self.logger.error(f"Ошибка обновления игровых данных: {str(e)}")
             return False
-
-    """Добавляет нового актера"""
 
     def add_actor(self, last_name, first_name, patronymic, rank, awards_count, experience):
         try:
@@ -426,11 +366,8 @@ class DatabaseManager:
             self.logger.error(f"Ошибка добавления актера: {str(e)}")
             return None
 
-    """Удаляет актера по ID"""
-
     def delete_actor(self, actor_id):
         try:
-            # Проверяем, что актер не занят в текущих постановках
             self.cursor.execute("""
                 SELECT COUNT(*) FROM actor_performances ap
                 JOIN performances p ON ap.performance_id = p.performance_id
@@ -441,7 +378,6 @@ class DatabaseManager:
                 self.logger.error(f"Актер с ID {actor_id} занят в текущих постановках")
                 return False, "Актер занят в текущих постановках"
 
-            # Проверяем, что после удаления останется минимум 8 актеров
             self.cursor.execute("SELECT COUNT(*) FROM actors")
             if self.cursor.fetchone()[0] <= 8:
                 self.logger.error("Невозможно удалить актера: минимальное число актеров - 8")
@@ -455,8 +391,6 @@ class DatabaseManager:
             self.connection.rollback()
             self.logger.error(f"Ошибка удаления актера: {str(e)}")
             return False, str(e)
-
-    """Создает новый спектакль"""
 
     def create_performance(self, title, plot_id, year, budget):
         try:
@@ -474,8 +408,6 @@ class DatabaseManager:
             self.logger.error(f"Ошибка создания спектакля: {str(e)}")
             return None
 
-    """Назначает актера на роль в спектакле"""
-
     def assign_actor_to_role(self, actor_id, performance_id, role, contract_cost):
         try:
             self.cursor.execute("""
@@ -490,8 +422,6 @@ class DatabaseManager:
             self.logger.error(f"Ошибка назначения актера: {str(e)}")
             return False
 
-    """Завершает спектакль с указанной выручкой"""
-
     def complete_performance(self, performance_id, revenue):
         try:
             self.cursor.execute("""
@@ -500,7 +430,6 @@ class DatabaseManager:
                 WHERE performance_id = %s
             """, (revenue, performance_id))
 
-            # Обновляем опыт актеров
             self.cursor.execute("""
                 UPDATE actors a
                 SET experience = a.experience + 1
@@ -515,8 +444,6 @@ class DatabaseManager:
             self.connection.rollback()
             self.logger.error(f"Ошибка завершения спектакля: {str(e)}")
             return False
-
-    """Обновляет фактический бюджет спектакля"""
 
     def update_performance_budget(self, performance_id, budget):
         try:
@@ -533,15 +460,11 @@ class DatabaseManager:
             self.logger.error(f"Ошибка обновления бюджета: {str(e)}")
             return False
 
-    """Повышает звание актера"""
-
     def upgrade_actor_rank(self, actor_id):
         try:
-            # Получаем текущее звание актера
             self.cursor.execute("SELECT rank FROM actors WHERE actor_id = %s", (actor_id,))
             current_rank = self.cursor.fetchone()[0]
 
-            # Определяем следующее звание
             rank_order = list(ActorRank)
             rank_idx = [r.value for r in rank_order].index(current_rank)
 
@@ -562,8 +485,6 @@ class DatabaseManager:
             self.connection.rollback()
             self.logger.error(f"Ошибка повышения звания: {str(e)}")
             return False
-
-    """Добавляет актеру награду"""
 
     def award_actor(self, actor_id):
         try:
