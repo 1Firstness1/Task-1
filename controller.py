@@ -2,15 +2,22 @@ import random
 from data import DatabaseManager, ActorRank
 from logger import Logger
 
+
 class TheaterController:
     def __init__(self):
         self.db = DatabaseManager()
         self.logger = Logger()
         self.is_connected = False
 
+    def set_connection_params(self, dbname, user, password, host, port):
+        self.db.set_connection_params(dbname, user, password, host, port)
+
     def connect_to_database(self):
         self.is_connected = self.db.connect()
         return self.is_connected
+
+    def create_database(self):
+        return self.db.create_database()
 
     def initialize_database(self):
         result1 = self.db.create_schema()
@@ -19,6 +26,9 @@ class TheaterController:
 
     def reset_database(self):
         return self.db.reset_database()
+
+    def reset_schema(self):
+        return self.db.reset_schema()
 
     def get_game_state(self):
         return self.db.get_game_data()
@@ -142,10 +152,10 @@ class TheaterController:
         if profit > 0:
             rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
             sorted_actors = sorted(actors,
-                               key=lambda a: (rank_order.index(a['rank']),
-                                              a['experience'],
-                                              a['awards_count']),
-                               reverse=True)
+                                   key=lambda a: (rank_order.index(a['rank']),
+                                                  a['experience'],
+                                                  a['awards_count']),
+                                   reverse=True)
 
             for i, actor in enumerate(sorted_actors[:3]):
                 self.db.award_actor(actor['actor_id'])

@@ -1,10 +1,16 @@
 import logging
 import os
 from datetime import datetime
+from PySide6.QtCore import Signal, QObject
 
-class Logger:
+class LogEmitter(QObject):
+    new_log = Signal(str)
+
+class Logger(QObject):
     def __init__(self, log_file="app.log"):
+        super().__init__()
         self.logger = logging.getLogger(__name__)
+        self.emitter = LogEmitter()
 
         if self.logger.handlers:
             self.logger.handlers.clear()
@@ -27,12 +33,16 @@ class Logger:
 
     def info(self, message):
         self.logger.info(message)
+        self.emitter.new_log.emit(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - INFO - {message}")
 
     def warning(self, message):
         self.logger.warning(message)
+        self.emitter.new_log.emit(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - WARNING - {message}")
 
     def error(self, message):
         self.logger.error(message)
+        self.emitter.new_log.emit(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ERROR - {message}")
 
     def debug(self, message):
         self.logger.debug(message)
+        self.emitter.new_log.emit(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - DEBUG - {message}")

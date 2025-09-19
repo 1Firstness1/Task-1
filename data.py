@@ -5,6 +5,7 @@ import enum
 from datetime import datetime
 from logger import Logger
 
+
 class ActorRank(enum.Enum):
     BEGINNER = "Начинающий"
     REGULAR = "Постоянный"
@@ -34,8 +35,15 @@ class ActorRank(enum.Enum):
 
         return -1 if idx1 < idx2 else 1
 
+
 class DatabaseManager:
-    def __init__(self, dbname="task1", user="artem", password="", host="localhost", port="5432"):
+    def __init__(self):
+        self.logger = Logger()
+        self.connection_params = None
+        self.connection = None
+        self.cursor = None
+
+    def set_connection_params(self, dbname, user, password, host, port):
         self.connection_params = {
             "dbname": dbname,
             "user": user,
@@ -43,11 +51,13 @@ class DatabaseManager:
             "host": host,
             "port": port
         }
-        self.logger = Logger()
-        self.connection = None
-        self.cursor = None
+        self.logger.info(f"Установлены параметры подключения: {dbname}@{host}:{port}")
 
     def connect(self):
+        if self.connection_params is None:
+            self.logger.error("Параметры подключения не установлены")
+            return False
+
         try:
             self.connection = psycopg2.connect(**self.connection_params)
             self.cursor = self.connection.cursor(cursor_factory=DictCursor)
@@ -55,6 +65,48 @@ class DatabaseManager:
             return True
         except psycopg2.Error as e:
             self.logger.error(f"Ошибка подключения к БД: {str(e)}")
+            return False
+
+    def connect_to_postgres(self):
+        if self.connection_params is None:
+            self.logger.error("Параметры подключения не установлены")
+            return False
+
+        try:
+            postgres_params = self.connection_params.copy()
+            postgres_params["dbname"] = "postgres"
+
+            conn = psycopg2.connect(**postgres_params)
+            conn.autocommit = True
+            cursor = conn.cursor()
+            self.logger.info(f"Подключение к системной БД postgres успешно")
+            return conn, cursor
+        except psycopg2.Error as e:
+            self.logger.error(f"Ошибка подключения к системной БД postgres: {str(e)}")
+            return None, None
+
+    def create_database(self):
+        try:
+            conn, cursor = self.connect_to_postgres()
+            if not conn:
+                return False
+
+            dbname = self.connection_params["dbname"]
+
+            cursor.execute(f"SELECT 1 FROM pg_database WHERE datname = %s", (dbname,))
+            exists = cursor.fetchone()
+
+            if not exists:
+                cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(dbname)))
+                self.logger.info(f"База данных {dbname} успешно создана")
+            else:
+                self.logger.info(f"База данных {dbname} уже существует")
+
+            cursor.close()
+            conn.close()
+            return True
+        except psycopg2.Error as e:
+            self.logger.error(f"Ошибка создания БД: {str(e)}")
             return False
 
     def disconnect(self):
@@ -274,6 +326,26 @@ class DatabaseManager:
         except psycopg2.Error as e:
             self.connection.rollback()
             self.logger.error(f"Ошибка сброса БД: {str(e)}")
+            return False
+
+    def reset_schema(self):
+        try:
+            self.cursor.execute("""
+                DROP TABLE IF EXISTS actor_performances CASCADE;
+                DROP TABLE IF EXISTS performances CASCADE;
+                DROP TABLE IF EXISTS actors CASCADE;
+                DROP TABLE IF EXISTS plots CASCADE;
+                DROP TABLE IF EXISTS game_data CASCADE;
+                DROP TYPE IF EXISTS actor_rank CASCADE;
+            """)
+            self.connection.commit()
+            self.logger.info("Схема БД успешно удалена")
+
+            success = self.create_schema() and self.init_sample_data()
+            return success
+        except psycopg2.Error as e:
+            self.connection.rollback()
+            self.logger.error(f"Ошибка сброса схемы БД: {str(e)}")
             return False
 
     def get_actors(self):
