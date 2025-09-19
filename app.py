@@ -1,17 +1,12 @@
 import sys
-import os
-import psycopg2
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
-                               QHBoxLayout, QWidget, QDialog, QMessageBox, QComboBox,
-                               QSpinBox, QTableWidget, QTableWidgetItem, QLineEdit,
-                               QFormLayout, QTabWidget, QScrollArea, QFrame, QGridLayout,
-                               QDoubleSpinBox, QHeaderView, QSplitter, QTextEdit)
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QFont, QIcon, QPixmap
-from datetime import datetime
+                              QHBoxLayout, QWidget, QDialog, QMessageBox, QComboBox,
+                              QSpinBox, QTableWidget, QTableWidgetItem, QLineEdit,
+                              QFormLayout, QTabWidget, QScrollArea, QFrame, QHeaderView, QTextEdit)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
 
 from controller import TheaterController
-from data import ActorRank
 from logger import Logger
 
 
