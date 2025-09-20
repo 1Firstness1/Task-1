@@ -9,7 +9,6 @@ from PySide6.QtGui import QFont
 from controller import TheaterController
 from logger import Logger
 
-
 class LoginDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -533,6 +532,41 @@ class MainWindow(QMainWindow):
         self.controller.close()
         event.accept()
 
+class NumericTableItem(QTableWidgetItem):
+
+    def __init__(self, text, value):
+        super().__init__(text)
+        self.value = value
+
+    def __lt__(self, other):
+        if hasattr(other, 'value'):
+            return self.value < other.value
+        return super().__lt__(other)
+
+
+class RankTableItem(QTableWidgetItem):
+
+    def __init__(self, text):
+        super().__init__(text)
+        rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
+        self.rank_index = rank_order.index(text) if text in rank_order else -1
+
+    def __lt__(self, other):
+        if isinstance(other, RankTableItem):
+            return self.rank_index < other.rank_index
+        return super().__lt__(other)
+
+
+class CurrencyTableItem(QTableWidgetItem):
+
+    def __init__(self, text, value):
+        super().__init__(text)
+        self.value = value
+
+    def __lt__(self, other):
+        if hasattr(other, 'value'):
+            return self.value < other.value
+        return super().__lt__(other)
 
 class NewPerformanceDialog(QDialog):
     def __init__(self, controller, parent=None):
@@ -942,18 +976,11 @@ class PerformanceDetailsDialog(QDialog):
 
         for i, actor in enumerate(actors):
             name_item = QTableWidgetItem(f"{actor['last_name']} {actor['first_name']} {actor['patronymic']}")
-            rank_item = QTableWidgetItem(actor['rank'])
-
-            exp_item = QTableWidgetItem(str(actor['experience']))
-            exp_item.setData(Qt.UserRole, actor['experience'])
-
-            awards_item = QTableWidgetItem(str(actor['awards_count']))
-            awards_item.setData(Qt.UserRole, actor['awards_count'])
-
+            rank_item = RankTableItem(actor['rank'])
+            exp_item = NumericTableItem(str(actor['experience']), actor['experience'])
+            awards_item = NumericTableItem(str(actor['awards_count']), actor['awards_count'])
             role_item = QTableWidgetItem(actor['role'])
-
-            contract_item = QTableWidgetItem(f"{actor['contract_cost']:,} ₽".replace(',', ' '))
-            contract_item.setData(Qt.UserRole, actor['contract_cost'])
+            contract_item = CurrencyTableItem(f"{actor['contract_cost']:,} ₽".replace(',', ' '), actor['contract_cost'])
 
             actors_table.setItem(i, 0, name_item)
             actors_table.setItem(i, 1, rank_item)
@@ -1004,20 +1031,16 @@ class PerformanceHistoryDialog(QDialog):
             self.row_to_performance_id = {}
 
             for i, perf in enumerate(self.performances):
-                year_item = QTableWidgetItem(str(perf['year']))
+                year_item = NumericTableItem(str(perf['year']), perf['year'])
                 year_item.setData(Qt.UserRole, perf['performance_id'])
 
                 title_item = QTableWidgetItem(perf['title'])
                 plot_item = QTableWidgetItem(perf['plot_title'])
-                budget_item = QTableWidgetItem(f"{perf['budget']:,} ₽".replace(',', ' '))
-                revenue_item = QTableWidgetItem(f"{perf['revenue']:,} ₽".replace(',', ' '))
-
-                budget_item.setData(Qt.UserRole, perf['budget'])
-                revenue_item.setData(Qt.UserRole, perf['revenue'])
+                budget_item = CurrencyTableItem(f"{perf['budget']:,} ₽".replace(',', ' '), perf['budget'])
+                revenue_item = CurrencyTableItem(f"{perf['revenue']:,} ₽".replace(',', ' '), perf['revenue'])
 
                 profit = perf['revenue'] - perf['budget']
-                profit_item = QTableWidgetItem(f"{profit:,} ₽".replace(',', ' '))
-                profit_item.setData(Qt.UserRole, profit)
+                profit_item = CurrencyTableItem(f"{profit:,} ₽".replace(',', ' '), profit)
 
                 if profit > 0:
                     profit_item.setForeground(Qt.green)
@@ -1101,20 +1124,13 @@ class ActorsManagementDialog(QDialog):
         self.actors_table.setSortingEnabled(False)
 
         for i, actor in enumerate(self.all_actors):
-            id_item = QTableWidgetItem(str(actor['actor_id']))
-            id_item.setData(Qt.UserRole, actor['actor_id'])
-
+            id_item = NumericTableItem(str(actor['actor_id']), actor['actor_id'])
             last_name_item = QTableWidgetItem(actor['last_name'])
             first_name_item = QTableWidgetItem(actor['first_name'])
             patronymic_item = QTableWidgetItem(actor['patronymic'])
-
-            rank_item = QTableWidgetItem(actor['rank'])
-
-            exp_item = QTableWidgetItem(str(actor['experience']))
-            exp_item.setData(Qt.UserRole, actor['experience'])
-
-            awards_item = QTableWidgetItem(str(actor['awards_count']))
-            awards_item.setData(Qt.UserRole, actor['awards_count'])
+            rank_item = RankTableItem(actor['rank'])
+            exp_item = NumericTableItem(str(actor['experience']), actor['experience'])
+            awards_item = NumericTableItem(str(actor['awards_count']), actor['awards_count'])
 
             self.actors_table.setItem(i, 0, id_item)
             self.actors_table.setItem(i, 1, last_name_item)
