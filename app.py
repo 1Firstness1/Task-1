@@ -319,8 +319,8 @@ class MainWindow(QMainWindow):
         <p><b>1. Обновить данные</b> - обновляйте текущие данные в таблицах на стартовые</p>
         <p><b>2. Обновить Схему</b> - обновляйте текущую схему в базе на новую</p>
         <p><b>3. Новая постановка</b> - организуйте спектакль, выбрав сюжет и актеров</p>
-        <p><b>4. История постановок</b> - просмотрите результаты прошлых спектаклей</p>
-        <p><b>5. Управление актерами</b> - добавляйте и удаляйте актеров</p>
+        <p><b>4. Постановки</b> - просмотрите результаты прошлых спектаклей</p>
+        <p><b>5. Актёры/b> - добавляйте и удаляйте актеров</p>
         <p><b>6. Пропустить год</b> - продайте права на постановку и получите дополнительные средства</p>
         """
         instruction_label = QLabel(instruction_text)
@@ -971,19 +971,19 @@ class PerformanceHistoryDialog(QDialog):
         self.controller = controller
         self.parent_window = parent
 
-        self.setWindowTitle("Постановок")
+        self.setWindowTitle("Постановки")
         self.setMinimumSize(800, 500)
 
         layout = QVBoxLayout(self)
 
-        title_label = QLabel("<h2>История постановок</h2>")
+        title_label = QLabel("<h2>Постановки</h2>")
         title_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(title_label)
 
         self.performances = controller.get_performances_history()
 
         if not self.performances:
-            empty_label = QLabel("История постановок пуста.")
+            empty_label = QLabel("Постановок нет.")
             empty_label.setAlignment(Qt.AlignCenter)
             layout.addWidget(empty_label)
         else:
@@ -1051,7 +1051,7 @@ class ActorsManagementDialog(QDialog):
         self.controller = controller
         self.all_actors = controller.get_all_actors()
 
-        self.setWindowTitle("Управление актерами")
+        self.setWindowTitle("Актёры")
         self.setMinimumSize(800, 600)
 
         layout = QVBoxLayout(self)
