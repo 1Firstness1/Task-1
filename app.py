@@ -9,6 +9,7 @@ from PySide6.QtGui import QFont
 from controller import TheaterController
 from logger import Logger
 
+
 class LoginDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -532,6 +533,7 @@ class MainWindow(QMainWindow):
         self.controller.close()
         event.accept()
 
+
 class NumericTableItem(QTableWidgetItem):
 
     def __init__(self, text, value):
@@ -567,6 +569,7 @@ class CurrencyTableItem(QTableWidgetItem):
         if hasattr(other, 'value'):
             return self.value < other.value
         return super().__lt__(other)
+
 
 class NewPerformanceDialog(QDialog):
     def __init__(self, controller, parent=None):
@@ -948,6 +951,7 @@ class NewPerformanceDialog(QDialog):
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось рассчитать результаты спектакля")
 
+
 class PerformanceDetailsDialog(QDialog):
     def __init__(self, performance, actors, parent=None):
         super().__init__(parent)
@@ -998,6 +1002,7 @@ class PerformanceDetailsDialog(QDialog):
         close_btn = QPushButton("Закрыть")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
+
 
 class PerformanceHistoryDialog(QDialog):
     def __init__(self, controller, parent=None):
@@ -1073,6 +1078,7 @@ class PerformanceHistoryDialog(QDialog):
     def show_performance_details(self, row, col):
         perf_id = self.history_table.item(row, 0).data(Qt.UserRole)
         self.parent_window.show_performance_details(perf_id)
+
 
 class ActorsManagementDialog(QDialog):
     def __init__(self, controller, parent=None):
