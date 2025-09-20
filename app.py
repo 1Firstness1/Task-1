@@ -914,7 +914,6 @@ class NewPerformanceDialog(QDialog):
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось рассчитать результаты спектакля")
 
-
 class PerformanceDetailsDialog(QDialog):
     def __init__(self, performance, actors, parent=None):
         super().__init__(parent)
@@ -944,10 +943,17 @@ class PerformanceDetailsDialog(QDialog):
         for i, actor in enumerate(actors):
             name_item = QTableWidgetItem(f"{actor['last_name']} {actor['first_name']} {actor['patronymic']}")
             rank_item = QTableWidgetItem(actor['rank'])
+
             exp_item = QTableWidgetItem(str(actor['experience']))
+            exp_item.setData(Qt.UserRole, actor['experience'])
+
             awards_item = QTableWidgetItem(str(actor['awards_count']))
+            awards_item.setData(Qt.UserRole, actor['awards_count'])
+
             role_item = QTableWidgetItem(actor['role'])
+
             contract_item = QTableWidgetItem(f"{actor['contract_cost']:,} ₽".replace(',', ' '))
+            contract_item.setData(Qt.UserRole, actor['contract_cost'])
 
             actors_table.setItem(i, 0, name_item)
             actors_table.setItem(i, 1, rank_item)
@@ -958,12 +964,13 @@ class PerformanceDetailsDialog(QDialog):
 
         actors_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
+        actors_table.setSortingEnabled(True)
+
         layout.addWidget(actors_table)
 
         close_btn = QPushButton("Закрыть")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
-
 
 class PerformanceHistoryDialog(QDialog):
     def __init__(self, controller, parent=None):
@@ -1044,7 +1051,6 @@ class PerformanceHistoryDialog(QDialog):
         perf_id = self.history_table.item(row, 0).data(Qt.UserRole)
         self.parent_window.show_performance_details(perf_id)
 
-
 class ActorsManagementDialog(QDialog):
     def __init__(self, controller, parent=None):
         super().__init__(parent)
@@ -1062,10 +1068,13 @@ class ActorsManagementDialog(QDialog):
 
         self.actors_table = QTableWidget()
         self.actors_table.setColumnCount(7)
-        self.actors_table.setHorizontalHeaderLabels(["ID", "Фамилия", "Имя", "Отчество", "Звание", "Опыт", "Награды"])
+        self.actors_table.setHorizontalHeaderLabels(
+            ["ID", "Фамилия", "Имя", "Отчество", "Звание", "Опыт", "Награды"])
         self.actors_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         self.update_actors_table()
+
+        self.actors_table.setSortingEnabled(True)
 
         layout.addWidget(self.actors_table)
 
@@ -1089,14 +1098,23 @@ class ActorsManagementDialog(QDialog):
         self.all_actors = self.controller.get_all_actors()
         self.actors_table.setRowCount(len(self.all_actors))
 
+        self.actors_table.setSortingEnabled(False)
+
         for i, actor in enumerate(self.all_actors):
             id_item = QTableWidgetItem(str(actor['actor_id']))
+            id_item.setData(Qt.UserRole, actor['actor_id'])
+
             last_name_item = QTableWidgetItem(actor['last_name'])
             first_name_item = QTableWidgetItem(actor['first_name'])
             patronymic_item = QTableWidgetItem(actor['patronymic'])
+
             rank_item = QTableWidgetItem(actor['rank'])
+
             exp_item = QTableWidgetItem(str(actor['experience']))
+            exp_item.setData(Qt.UserRole, actor['experience'])
+
             awards_item = QTableWidgetItem(str(actor['awards_count']))
+            awards_item.setData(Qt.UserRole, actor['awards_count'])
 
             self.actors_table.setItem(i, 0, id_item)
             self.actors_table.setItem(i, 1, last_name_item)
@@ -1105,6 +1123,8 @@ class ActorsManagementDialog(QDialog):
             self.actors_table.setItem(i, 4, rank_item)
             self.actors_table.setItem(i, 5, exp_item)
             self.actors_table.setItem(i, 6, awards_item)
+
+        self.actors_table.setSortingEnabled(True)
 
     def add_actor(self):
         dialog = AddActorDialog(self)
