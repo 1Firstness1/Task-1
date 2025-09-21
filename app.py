@@ -1,10 +1,11 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout,
-                              QHBoxLayout, QWidget, QDialog, QMessageBox, QComboBox,
-                              QSpinBox, QTableWidget, QTableWidgetItem, QLineEdit,
-                              QFormLayout, QTabWidget, QScrollArea, QFrame, QHeaderView, QTextEdit)
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+                               QHBoxLayout, QWidget, QDialog, QMessageBox, QComboBox,
+                               QSpinBox, QTableWidget, QTableWidgetItem, QLineEdit,
+                               QFormLayout, QTabWidget, QScrollArea, QFrame, QHeaderView, QTextEdit)
+from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtGui import QFont, QIntValidator
+
 
 from controller import TheaterController
 from logger import Logger
@@ -15,6 +16,32 @@ class LoginDialog(QDialog):
         super().__init__(parent)
         self.controller = TheaterController()
         self.logger = Logger()
+
+        # Единый стиль для всех QMessageBox с уменьшенными кнопками
+        self.message_box_style = """
+            QMessageBox {
+                background-color: #f5f5f5;
+            }
+            QMessageBox QLabel {
+                color: #333333;
+            }
+            QMessageBox QPushButton {
+                background-color: #4a86e8;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-weight: bold;
+                min-width: 40px;
+                min-height: 20px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #3a76d8;
+            }
+            QMessageBox QPushButton:pressed {
+                background-color: #2a66c8;
+            }
+        """
 
         self.setWindowTitle("Подключение к базе данных")
         self.setMinimumWidth(400)
@@ -40,11 +67,47 @@ class LoginDialog(QDialog):
         form_layout.labelForField = lambda field: form_layout.itemAt(form_layout.getWidgetPosition(field)[0],
                                                                      QFormLayout.LabelRole).widget()
 
-        self.dbname_edit = QLineEdit("task1")
-        self.dbname_edit.setStyleSheet("color: black;")
-        dbname_label = QLabel("База данных:")
-        dbname_label.setStyleSheet(form_label_style)
-        form_layout.addRow(dbname_label, self.dbname_edit)
+        self.db_combo = QComboBox()
+        self.db_combo.addItem("task1")
+        self.db_combo.addItem("postgres")
+        self.db_combo.setStyleSheet("""
+            QComboBox {
+                background-color: white;
+                color: black;
+                border: 1px solid #c0c0c0;
+                border-radius: 4px;
+                padding: 6px;
+                min-height: 5px;
+                min-width: 88px;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left: 1px solid #c0c0c0;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                width: 10px;
+                height: 10px;
+                background: #4a86e8;
+                border-radius: 5px;
+            }
+            QComboBox QAbstractItemView {
+                border: 1px solid #c0c0c0;
+                border-radius: 4px;
+                background-color: white;
+                color: black;
+                selection-background-color: #d0e8ff;
+                selection-color: black;
+                padding: 4px;
+            }
+        """)
+        db_label = QLabel("База данных:")
+        db_label.setStyleSheet(form_label_style)
+        form_layout.addRow(db_label, self.db_combo)
 
         self.host_edit = QLineEdit("localhost")
         self.host_edit.setStyleSheet("color: black;")
@@ -138,7 +201,7 @@ class LoginDialog(QDialog):
         layout.addLayout(buttons_layout)
 
     def try_connect(self):
-        dbname = self.dbname_edit.text()
+        dbname = self.db_combo.currentText()
         host = self.host_edit.text()
         port = self.port_edit.text()
         user = self.user_edit.text()
@@ -149,7 +212,7 @@ class LoginDialog(QDialog):
             warn_box.setWindowTitle("Ошибка")
             warn_box.setText("Все поля, кроме пароля, должны быть заполнены")
             warn_box.setIcon(QMessageBox.Warning)
-            warn_box.setStyleSheet("QLabel { color: black; } QPushButton { color: black; }")
+            warn_box.setStyleSheet(self.message_box_style)
             warn_box.exec()
             return
 
@@ -164,36 +227,32 @@ class LoginDialog(QDialog):
                 if not table_exists:
                     reply_box = QMessageBox(self)
                     reply_box.setWindowTitle("Схема не найдена")
-                    reply_box.setText("Структура базы данных не найдена. Создать схемы и таблицы?")
-                    reply_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-                    reply_box.setIcon(QMessageBox.Question)
-                    reply_box.setStyleSheet("QLabel { color: black; } QPushButton { color: black; }")
+                    reply_box.setText("Структура базы данных не найдена. Схемы и таблицы будут созданы")
+                    reply_box.setIcon(QMessageBox.Information)
+                    reply_box.setStyleSheet(self.message_box_style)
                     reply = reply_box.exec()
 
-                    if reply == QMessageBox.Yes:
-                        if self.controller.initialize_database():
-                            ok_box = QMessageBox(self)
-                            ok_box.setWindowTitle("Успех")
-                            ok_box.setText("Схема и таблицы успешно созданы")
-                            ok_box.setIcon(QMessageBox.Information)
-                            ok_box.setStyleSheet("QLabel { color: black; } QPushButton { color: black; }")
-                            ok_box.exec()
-                        else:
-                            err_box = QMessageBox(self)
-                            err_box.setWindowTitle("Ошибка")
-                            err_box.setText("Не удалось создать схему базы данных")
-                            err_box.setIcon(QMessageBox.Critical)
-                            err_box.setStyleSheet("QLabel { color: black; } QPushButton { color: black; }")
-                            err_box.exec()
-                            return
+                    if self.controller.initialize_database():
+                        ok_box = QMessageBox(self)
+                        ok_box.setWindowTitle("Успех")
+                        ok_box.setText("Схема и таблицы успешно созданы")
+                        ok_box.setIcon(QMessageBox.Information)
+                        ok_box.setStyleSheet(self.message_box_style)
+                        ok_box.exec()
                     else:
+                        err_box = QMessageBox(self)
+                        err_box.setWindowTitle("Ошибка")
+                        err_box.setText("Не удалось создать схему базы данных")
+                        err_box.setIcon(QMessageBox.Critical)
+                        err_box.setStyleSheet(self.message_box_style)
+                        err_box.exec()
                         return
 
                 success_box = QMessageBox(self)
                 success_box.setWindowTitle("Успех")
                 success_box.setText("Подключение успешно установлено")
                 success_box.setIcon(QMessageBox.Information)
-                success_box.setStyleSheet("QLabel { color: black; } QPushButton { color: black; }")
+                success_box.setStyleSheet(self.message_box_style)
                 success_box.exec()
                 self.accept()
 
@@ -202,51 +261,69 @@ class LoginDialog(QDialog):
                 err_box.setWindowTitle("Ошибка")
                 err_box.setText(f"Ошибка при проверке структуры базы данных: {str(e)}")
                 err_box.setIcon(QMessageBox.Critical)
-                err_box.setStyleSheet("QLabel { color: black; } QPushButton { color: black; }")
+                err_box.setStyleSheet(self.message_box_style)
                 err_box.exec()
         else:
             err_box = QMessageBox(self)
             err_box.setWindowTitle("Ошибка")
             err_box.setText("Не удалось подключиться к базе данных. Проверьте параметры подключения.")
             err_box.setIcon(QMessageBox.Critical)
-            err_box.setStyleSheet("QLabel { color: black; } QPushButton { color: black; }")
+            err_box.setStyleSheet(self.message_box_style)
             err_box.exec()
 
     def create_database(self):
-        dbname = self.dbname_edit.text()
+        dbname = self.db_combo.currentText()
         host = self.host_edit.text()
         port = self.port_edit.text()
         user = self.user_edit.text()
         password = self.password_edit.text()
 
         if not dbname or not host or not port or not user:
-            QMessageBox.warning(self, "Ошибка", "Все поля, кроме пароля, должны быть заполнены")
+            warn_box = QMessageBox(self)
+            warn_box.setWindowTitle("Ошибка")
+            warn_box.setText("Все поля, кроме пароля, должны быть заполнены")
+            warn_box.setIcon(QMessageBox.Warning)
+            warn_box.setStyleSheet(self.message_box_style)
+            warn_box.exec()
             return
 
         self.controller.set_connection_params(dbname, user, password, host, port)
 
         if self.controller.create_database():
-            reply = QMessageBox.question(
-                self,
-                "База данных создана",
-                "База данных успешно создана. Хотите создать схемы и таблицы?",
-                QMessageBox.Yes | QMessageBox.No
-            )
+            reply_box = QMessageBox(self)
+            reply_box.setWindowTitle("База данных создана")
+            reply_box.setText("База данных успешно создана. Хотите создать схемы и таблицы?")
+            reply_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            reply_box.setIcon(QMessageBox.Question)
+            reply_box.setStyleSheet(self.message_box_style)
+            reply = reply_box.exec()
 
             if reply == QMessageBox.Yes:
                 if self.controller.connect_to_database() and self.controller.initialize_database():
-                    QMessageBox.information(self, "Успех", "База данных, схема и таблицы успешно созданы")
+                    success_box = QMessageBox(self)
+                    success_box.setWindowTitle("Успех")
+                    success_box.setText("База данных, схема и таблицы успешно созданы")
+                    success_box.setIcon(QMessageBox.Information)
+                    success_box.setStyleSheet(self.message_box_style)
+                    success_box.exec()
                     self.accept()
                 else:
-                    QMessageBox.critical(self, "Ошибка", "Не удалось создать схему базы данных")
+                    err_box = QMessageBox(self)
+                    err_box.setWindowTitle("Ошибка")
+                    err_box.setText("Не удалось создать схему базы данных")
+                    err_box.setIcon(QMessageBox.Critical)
+                    err_box.setStyleSheet(self.message_box_style)
+                    err_box.exec()
             else:
-                if self.controller.connect_to_database():
-                    QMessageBox.information(self, "Успех", "Подключение успешно установлено")
-                    self.accept()
-                else:
-                    QMessageBox.critical(self, "Ошибка", "Не удалось подключиться к созданной базе данных")
+                # Если пользователь отказался создавать схемы и таблицы, просто выходим
+                return
         else:
-            QMessageBox.critical(self, "Ошибка", "Не удалось создать базу данных")
+            err_box = QMessageBox(self)
+            err_box.setWindowTitle("Ошибка")
+            err_box.setText("Не удалось создать базу данных")
+            err_box.setIcon(QMessageBox.Critical)
+            err_box.setStyleSheet(self.message_box_style)
+            err_box.exec()
 
 
 class MainWindow(QMainWindow):
@@ -346,9 +423,30 @@ class MainWindow(QMainWindow):
             log_content = f.read()
             self.log_display.setText(log_content)
 
+        QTimer.singleShot(100, lambda: self.log_display.verticalScrollBar().setValue(
+            self.log_display.verticalScrollBar().maximum()))
+
         self.logger.set_main_window_log_display(self.log_display)
 
         self.logger.info("Главное окно инициализировано")
+
+        # В методе __init__ класса MainWindow, после создания вкладок с логами
+        self.data_tabs.addTab(log_tab, "Логи")
+        self.data_tabs.setCurrentIndex(0)
+
+        # Добавляем кнопку отключения от БД
+        disconnect_btn_layout = QHBoxLayout()
+        self.disconnect_btn = QPushButton("Отключиться от БД")
+        self.disconnect_btn.setFixedWidth(160)
+        self.disconnect_btn.clicked.connect(self.disconnect_from_db)
+        disconnect_btn_layout.addStretch()
+        disconnect_btn_layout.addWidget(self.disconnect_btn)
+        disconnect_btn_layout.addStretch()
+        main_layout.addLayout(disconnect_btn_layout)
+
+        with open("app.log", "r", encoding="utf-8") as f:
+            log_content = f.read()
+            self.log_display.setText(log_content)
 
         self.update_game_info()
 
@@ -416,14 +514,33 @@ class MainWindow(QMainWindow):
             background-color: white;
             color: #333333;
             border: 1px solid #c0c0c0;
-            padding: 4px;
-            min-height: 20px;
+            border-radius: 4px;
+            padding: 6px;
+            min-height: 25px;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 20px;
+            border-left: 1px solid #c0c0c0;
+            border-top-right-radius: 4px;
+            border-bottom-right-radius: 4px;
+        }
+        QComboBox::down-arrow {
+            image: none;
+            width: 10px;
+            height: 10px;
+            background: #4a86e8;
+            border-radius: 5px;
         }
         QComboBox QAbstractItemView {
+            border: 1px solid #c0c0c0;
+            border-radius: 4px;
             background-color: white;
             color: #333333;
             selection-background-color: #d0e8ff;
             selection-color: #333333;
+            padding: 4px;
         }
         QLineEdit {
             background-color: white;
@@ -515,7 +632,7 @@ class MainWindow(QMainWindow):
         result = QMessageBox.question(
             self,
             "Пропустить год",
-            "Вы уверены, что хотите пропустить год? Театр продаст права на постановку другому театру и получит случайную сумму.",
+            "Вы уверены, что хотите пропустить год? Театр продаст права на постановку другому театру и получит случайную сумму дохода.",
             QMessageBox.Yes | QMessageBox.No
         )
 
@@ -528,6 +645,20 @@ class MainWindow(QMainWindow):
                 f"Театр получил {skip_result['rights_sale']:,} ₽ за продажу прав на постановку.".replace(',', ' ')
             )
             self.update_game_info()
+
+    # Добавить метод в класс MainWindow
+    def disconnect_from_db(self):
+        confirm = QMessageBox.question(
+            self,
+            "Подтверждение",
+            "Вы уверены, что хотите отключиться от базы данных и выйти из программы?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if confirm == QMessageBox.Yes:
+            self.logger.info("Отключение от базы данных и выход из программы")
+            self.controller.close()
+            self.close()
 
     def closeEvent(self, event):
         self.controller.close()
@@ -571,6 +702,31 @@ class CurrencyTableItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
+class ValidatedLineEdit(QLineEdit):
+    def __init__(self, controller, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.controller = controller
+
+    def keyPressEvent(self, event):
+        # Get the text that would result from this key press
+        old_text = self.text()
+        cursor_pos = self.cursorPosition()
+
+        # Call the parent implementation to handle the key press
+        super().keyPressEvent(event)
+
+        # Check if the resulting text is valid
+        new_text = self.text()
+
+        # If the text is empty, allow it
+        if not new_text or self.controller.is_valid_text_input(new_text):
+            return
+
+        # If not valid, restore the old text and cursor position
+        self.setText(old_text)
+        self.setCursorPosition(cursor_pos)
+
+
 class NewPerformanceDialog(QDialog):
     def __init__(self, controller, parent=None):
         super().__init__(parent)
@@ -586,7 +742,7 @@ class NewPerformanceDialog(QDialog):
 
         form_layout = QFormLayout()
 
-        self.title_edit = QLineEdit()
+        self.title_edit = ValidatedLineEdit(controller)
         form_layout.addRow("Название спектакля:", self.title_edit)
 
         self.plot_combo = QComboBox()
@@ -739,7 +895,7 @@ class NewPerformanceDialog(QDialog):
             role_frame.setProperty("contract_cost", 0)
             role_layout = QHBoxLayout(role_frame)
 
-            role_name = QLineEdit()
+            role_name = ValidatedLineEdit(self.controller)
             role_name.setPlaceholderText(f"Роль {i + 1}")
             role_name.setMinimumWidth(180)
             role_name.setStyleSheet("color: black;")
@@ -1080,6 +1236,84 @@ class PerformanceHistoryDialog(QDialog):
         self.parent_window.show_performance_details(perf_id)
 
 
+class EditActorDialog(QDialog):
+    def __init__(self, controller, actor, parent=None):
+        super().__init__(parent)
+        self.controller = controller
+        self.actor = actor
+
+        self.setWindowTitle("Редактировать актера")
+        self.setMinimumWidth(400)
+
+        layout = QFormLayout(self)
+
+        label_style = "color: #333333; font-weight: bold;"
+
+        last_name_label = QLabel("Фамилия:")
+        last_name_label.setStyleSheet(label_style)
+        self.last_name_edit = ValidatedLineEdit(controller, actor['last_name'])
+        layout.addRow(last_name_label, self.last_name_edit)
+
+        first_name_label = QLabel("Имя:")
+        first_name_label.setStyleSheet(label_style)
+        self.first_name_edit = ValidatedLineEdit(controller, actor['first_name'])
+        layout.addRow(first_name_label, self.first_name_edit)
+
+        patronymic_label = QLabel("Отчество:")
+        patronymic_label.setStyleSheet(label_style)
+        self.patronymic_edit = ValidatedLineEdit(controller, actor['patronymic'])
+        layout.addRow(patronymic_label, self.patronymic_edit)
+
+        rank_label = QLabel("Звание:")
+        rank_label.setStyleSheet(label_style)
+        self.rank_combo = QComboBox()
+        rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
+        for rank in rank_order:
+            self.rank_combo.addItem(rank)
+        # Set the current rank
+        index = self.rank_combo.findText(actor['rank'])
+        if index >= 0:
+            self.rank_combo.setCurrentIndex(index)
+        layout.addRow(rank_label, self.rank_combo)
+
+        awards_label = QLabel("Количество наград:")
+        awards_label.setStyleSheet(label_style)
+        self.awards_spin = QSpinBox()
+        self.awards_spin.setRange(0, 20)
+        self.awards_spin.setValue(actor['awards_count'])
+        layout.addRow(awards_label, self.awards_spin)
+
+        exp_label = QLabel("Опыт (лет):")
+        exp_label.setStyleSheet(label_style)
+        self.exp_spin = QSpinBox()
+        self.exp_spin.setRange(0, 50)
+        self.exp_spin.setValue(actor['experience'])
+        layout.addRow(exp_label, self.exp_spin)
+
+        buttons_layout = QHBoxLayout()
+
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.clicked.connect(self.reject)
+        buttons_layout.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Сохранить")
+        save_btn.clicked.connect(self.validate_and_accept)
+        buttons_layout.addWidget(save_btn)
+
+        layout.addRow("", buttons_layout)
+
+    def validate_and_accept(self):
+        if not self.last_name_edit.text().strip():
+            QMessageBox.warning(self, "Ошибка", "Введите фамилию")
+            return
+
+        if not self.first_name_edit.text().strip():
+            QMessageBox.warning(self, "Ошибка", "Введите имя")
+            return
+
+        self.accept()
+
+
 class ActorsManagementDialog(QDialog):
     def __init__(self, controller, parent=None):
         super().__init__(parent)
@@ -1100,12 +1334,18 @@ class ActorsManagementDialog(QDialog):
         self.actors_table.setHorizontalHeaderLabels(
             ["ID", "Фамилия", "Имя", "Отчество", "Звание", "Опыт", "Награды"])
         self.actors_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.actors_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
         self.update_actors_table()
 
         self.actors_table.setSortingEnabled(True)
+        self.actors_table.cellDoubleClicked.connect(self.edit_actor)
 
         layout.addWidget(self.actors_table)
+
+        instruction_label = QLabel("Дважды щелкните по актеру для редактирования")
+        instruction_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(instruction_label)
 
         buttons_layout = QHBoxLayout()
 
@@ -1149,7 +1389,7 @@ class ActorsManagementDialog(QDialog):
         self.actors_table.setSortingEnabled(True)
 
     def add_actor(self):
-        dialog = AddActorDialog(self)
+        dialog = AddActorDialog(self.controller, self)
         if dialog.exec():
             last_name = dialog.last_name_edit.text().strip()
             first_name = dialog.first_name_edit.text().strip()
@@ -1165,6 +1405,31 @@ class ActorsManagementDialog(QDialog):
                 QMessageBox.information(self, "Успех", "Актер успешно добавлен.")
             else:
                 QMessageBox.warning(self, "Ошибка", "Не удалось добавить актера.")
+
+    def edit_actor(self, row, column):
+        actor_id = int(self.actors_table.item(row, 0).text())
+        actor = next((a for a in self.all_actors if a['actor_id'] == actor_id), None)
+
+        if not actor:
+            return
+
+        dialog = EditActorDialog(self.controller, actor, self)
+        if dialog.exec():
+            last_name = dialog.last_name_edit.text().strip()
+            first_name = dialog.first_name_edit.text().strip()
+            patronymic = dialog.patronymic_edit.text().strip()
+            rank = dialog.rank_combo.currentText()
+            awards_count = dialog.awards_spin.value()
+            experience = dialog.exp_spin.value()
+
+            success, message = self.controller.update_actor(
+                actor_id, last_name, first_name, patronymic, rank, awards_count, experience)
+
+            if success:
+                self.update_actors_table()
+                QMessageBox.information(self, "Успех", "Актер успешно обновлен.")
+            else:
+                QMessageBox.warning(self, "Ошибка", f"Не удалось обновить актера: {message}")
 
     def delete_actor(self):
         selected_rows = self.actors_table.selectedItems()
@@ -1193,8 +1458,9 @@ class ActorsManagementDialog(QDialog):
 
 
 class AddActorDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, controller, parent=None):
         super().__init__(parent)
+        self.controller = controller
         self.setWindowTitle("Добавить актера")
         self.setMinimumWidth(400)
 
@@ -1204,17 +1470,17 @@ class AddActorDialog(QDialog):
 
         last_name_label = QLabel("Фамилия:")
         last_name_label.setStyleSheet(label_style)
-        self.last_name_edit = QLineEdit()
+        self.last_name_edit = ValidatedLineEdit(controller)
         layout.addRow(last_name_label, self.last_name_edit)
 
         first_name_label = QLabel("Имя:")
         first_name_label.setStyleSheet(label_style)
-        self.first_name_edit = QLineEdit()
+        self.first_name_edit = ValidatedLineEdit(controller)
         layout.addRow(first_name_label, self.first_name_edit)
 
         patronymic_label = QLabel("Отчество:")
         patronymic_label.setStyleSheet(label_style)
-        self.patronymic_edit = QLineEdit()
+        self.patronymic_edit = ValidatedLineEdit(controller)
         layout.addRow(patronymic_label, self.patronymic_edit)
 
         rank_label = QLabel("Звание:")

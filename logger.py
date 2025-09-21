@@ -44,6 +44,10 @@ class Logger(QObject):
     def set_main_window_log_display(self, log_display):
         self._main_window_log_display = log_display
         self.emitter.new_log.connect(self._update_log_display)
+        # Scroll to bottom to show most recent logs
+        if self._main_window_log_display:
+            scrollbar = self._main_window_log_display.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
 
     def _update_log_display(self, message):
         if self._main_window_log_display:

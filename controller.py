@@ -194,8 +194,16 @@ class TheaterController:
     def add_new_actor(self, last_name, first_name, patronymic, rank, awards_count, experience):
         return self.db.add_actor(last_name, first_name, patronymic, rank, awards_count, experience)
 
+    def update_actor(self, actor_id, last_name, first_name, patronymic, rank, awards_count, experience):
+        return self.db.update_actor(actor_id, last_name, first_name, patronymic, rank, awards_count, experience)
+
     def delete_actor_by_id(self, actor_id):
         return self.db.delete_actor(actor_id)
+
+    def is_valid_text_input(self, text):
+        # Check if text contains only letters, numbers, spaces and basic punctuation
+        import re
+        return bool(re.match(r'^[а-яА-Яa-zA-Z0-9\s.,!?()-]*$', text))
 
     def close(self):
         self.db.disconnect()

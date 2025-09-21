@@ -351,7 +351,7 @@ class DatabaseManager:
 
     def get_actors(self):
         try:
-            self.cursor.execute("SELECT * FROM actors ORDER BY last_name, first_name")
+            self.cursor.execute("SELECT * FROM actors ORDER BY actor_id")
             return self.cursor.fetchall()
         except psycopg2.Error as e:
             self.logger.error(f"Ошибка получения списка актеров: {str(e)}")
@@ -438,6 +438,29 @@ class DatabaseManager:
             self.connection.rollback()
             self.logger.error(f"Ошибка добавления актера: {str(e)}")
             return None
+
+    def update_actor(self, actor_id, last_name, first_name, patronymic, rank, awards_count, experience):
+        try:
+            self.cursor.execute("""
+                UPDATE actors
+                SET last_name = %s, first_name = %s, patronymic = %s, 
+                    rank = %s, awards_count = %s, experience = %s
+                WHERE actor_id = %s
+                RETURNING actor_id
+            """, (last_name, first_name, patronymic, rank, awards_count, experience, actor_id))
+
+            updated_id = self.cursor.fetchone()
+            if not updated_id:
+                self.logger.error(f"Актер с ID {actor_id} не найден")
+                return False, "Актер не найден"
+
+            self.connection.commit()
+            self.logger.info(f"Обновлен актер с ID {actor_id}")
+            return True, ""
+        except psycopg2.Error as e:
+            self.connection.rollback()
+            self.logger.error(f"Ошибка обновления актера: {str(e)}")
+            return False, str(e)
 
     def delete_actor(self, actor_id):
         try:
