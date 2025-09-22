@@ -1439,11 +1439,6 @@ class PerformanceHistoryDialog(QDialog):
             self.history_table.setEditTriggers(QTableWidget.NoEditTriggers)
             self.history_table.cellDoubleClicked.connect(self.show_performance_details)
 
-            # Инструкция для пользователя
-            instruction_label = QLabel("Дважды щелкните по спектаклю для просмотра подробностей")
-            instruction_label.setAlignment(Qt.AlignCenter)
-
-            layout.addWidget(instruction_label)
             layout.addWidget(self.history_table)
 
         # Кнопка закрытия
@@ -1597,11 +1592,6 @@ class ActorsManagementDialog(QDialog):
         self.actors_table.cellDoubleClicked.connect(self.edit_actor)
 
         layout.addWidget(self.actors_table)
-
-        # Инструкция для пользователя
-        instruction_label = QLabel("Дважды щелкните по актеру для редактирования")
-        instruction_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(instruction_label)
 
         # Кнопки действий
         buttons_layout = QHBoxLayout()
