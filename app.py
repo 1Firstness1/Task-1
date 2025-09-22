@@ -842,6 +842,7 @@ class NewPerformanceDialog(QDialog):
     Диалог создания новой постановки.
     Позволяет выбрать сюжет, установить бюджет и назначить актеров на роли.
     """
+
     def __init__(self, controller, parent=None):
         super().__init__(parent)
         self.controller = controller
@@ -884,9 +885,10 @@ class NewPerformanceDialog(QDialog):
 
         # Бюджет спектакля
         self.budget_spin = QSpinBox()
-        self.budget_spin.setRange(100000, 10000000)
+        # Установка максимального значения равным капиталу театра
+        self.budget_spin.setRange(100000, self.game_data['capital'])
         self.budget_spin.setSingleStep(50000)
-        self.budget_spin.setValue(500000)
+        self.budget_spin.setValue(min(500000, self.game_data['capital']))  # Не превышаем капитал
         self.budget_spin.setPrefix("₽ ")
         self.budget_spin.valueChanged.connect(self.update_remaining_budget)
         form_layout.addRow("Бюджет спектакля:", self.budget_spin)
@@ -957,9 +959,27 @@ class NewPerformanceDialog(QDialog):
         )
         self.plot_info.setStyleSheet("background-color: #f0f0f0; padding: 10px; border-radius: 5px;")
 
-        # Установка минимального бюджета
+        # Установка минимального бюджета с учетом капитала
         min_budget = max(100000, plot['minimum_budget'])
-        self.budget_spin.setRange(min_budget, 10000000)
+        # Убедимся, что максимальный бюджет не превышает доступный капитал
+        max_budget = self.game_data['capital']
+
+        # Проверка, достаточно ли капитала для минимального бюджета
+        if min_budget > max_budget:
+            QMessageBox.warning(self, "Недостаточно средств",
+                                f"Для постановки этого сюжета требуется минимум {min_budget:,} ₽, "
+                                f"но доступный капитал составляет только {max_budget:,} ₽.")
+            # Если недостаточно средств, можно выбрать другой сюжет или отменить
+            self.budget_spin.setRange(min_budget, min_budget)  # Ограничиваем ввод
+        else:
+            self.budget_spin.setRange(min_budget, max_budget)
+
+        # Если текущее значение за пределами диапазона, корректируем его
+        current_value = self.budget_spin.value()
+        if current_value < min_budget:
+            self.budget_spin.setValue(min_budget)
+        elif current_value > max_budget:
+            self.budget_spin.setValue(max_budget)
 
         # Очистка предыдущих ролей
         for i in reversed(range(self.roles_layout.count())):

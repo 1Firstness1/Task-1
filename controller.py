@@ -192,30 +192,50 @@ class TheaterController:
         actual_budget = min(performance['budget'], total_spent)
         saved_budget = performance['budget'] - actual_budget
 
-        # Расчет базовой выручки
-        base_revenue = actual_budget * (0.8 + 0.1 * plot['demand'])
+        # Расчет базовой выручки (значительно снижена)
+        base_revenue = actual_budget * (0.5 + 0.08 * plot['demand'])
 
-        # Расчет бонусов за актеров
+        # Непредвиденные расходы (5-15% от бюджета)
+        unexpected_expenses = int(actual_budget * random.uniform(0.05, 0.15))
+        self.logger.info(f"Непредвиденные расходы спектакля {performance_id}: {unexpected_expenses}")
+
+        # Расчет бонусов за актеров (снижен эффект)
         actors_bonus = 0
         for actor in actors:
             rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
-            rank_multiplier = 1 + (rank_order.index(actor['rank']) * 0.1)
+            rank_multiplier = 1 + (rank_order.index(actor['rank']) * 0.08)
 
-            award_bonus = actor['awards_count'] * 0.05
-            exp_bonus = actor['experience'] * 0.01
+            award_bonus = actor['awards_count'] * 0.03
+            exp_bonus = actor['experience'] * 0.008
 
             actor_contribution = actor['contract_cost'] * rank_multiplier * (1 + award_bonus + exp_bonus)
             actors_bonus += actor_contribution
 
-        # Случайный фактор успеха
-        random_factor = random.uniform(0.9, 1.1)
+        # Определение типа спектакля
+        fate_roll = random.random()
+
+        # Провал: 60% шанс с доходом 30-60% от ожидаемого
+        if fate_roll < 0.6:
+            self.logger.info(f"Спектакль {performance_id} оказался провальным!")
+            random_factor = random.uniform(0.3, 0.6)  # Ещё ниже доходность при провале
+        # Норма: 30% шанс с доходом 60-90% от ожидаемого
+        elif fate_roll < 0.9:
+            self.logger.info(f"Спектакль {performance_id} прошел в обычном режиме")
+            random_factor = random.uniform(0.6, 0.9)  # Снижена доходность нормального результата
+        # Успех: 10% шанс с доходом 90-110% от ожидаемого
+        else:
+            self.logger.info(f"Спектакль {performance_id} прошел с большим успехом!")
+            random_factor = random.uniform(0.9, 1.1)  # Снижен максимальный бонус
 
         # Итоговая выручка и прибыль
         total_revenue = int((base_revenue + actors_bonus) * random_factor)
-        profit = total_revenue - actual_budget
 
-        # Обновление данных в БД
-        self.db.update_performance_budget(performance_id, actual_budget)
+        # Учитываем непредвиденные расходы при расчете прибыли
+        total_expenses = actual_budget + unexpected_expenses
+        profit = total_revenue - total_expenses
+
+        # Обновление данных в БД - передаем полные расходы включая непредвиденные
+        self.db.update_performance_budget(performance_id, total_expenses)
         self.db.complete_performance(performance_id, total_revenue)
 
         # Обновление игровых данных
@@ -224,7 +244,7 @@ class TheaterController:
         current_year = game_data['current_year'] + 1
         self.db.update_game_data(current_year, new_capital)
 
-        # Определение успешных актеров для награждения
+        # Определение успешных актеров для награждения (только если прибыль положительная)
         successful_actors = []
         if profit > 0:
             rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
@@ -239,18 +259,19 @@ class TheaterController:
                 self.db.award_actor(actor['actor_id'])
                 successful_actors.append(actor)
 
-                # Повышение звания самого успешного актера при высокой прибыли
-                if i == 0 and profit > actual_budget * 0.5:
+                # Повышение звания самого успешного актера
+                if i == 0 and profit > total_expenses * 0.4:
                     self.db.upgrade_actor_rank(actor['actor_id'])
 
         # Формирование результатов
         return True, {
             'revenue': total_revenue,
-            'budget': actual_budget,
+            'budget': total_expenses,  # Включаем непредвиденные расходы в общий бюджет
             'original_budget': performance['budget'],
             'saved_budget': saved_budget,
             'profit': profit,
-            'awarded_actors': successful_actors
+            'awarded_actors': successful_actors,
+            'unexpected_expenses': unexpected_expenses  # Добавлено в результаты
         }
 
     def skip_year(self):
@@ -265,7 +286,7 @@ class TheaterController:
         current_year = game_data['current_year']
         current_capital = game_data['capital']
 
-        # Расчет дохода от продажи прав (10-20% от капитала)
+        # Расчет дохода от продажи прав
         rights_sale = int(current_capital * random.uniform(0.1, 0.2))
 
         # Обновление данных
