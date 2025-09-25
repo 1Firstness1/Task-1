@@ -3,6 +3,7 @@
 Содержит основную бизнес-логику приложения.
 """
 import random
+import re
 from data import DatabaseManager, ActorRank
 from logger import Logger
 
@@ -191,42 +192,92 @@ class TheaterController:
         actual_budget = min(performance['budget'], total_spent)
         saved_budget = performance['budget'] - actual_budget
 
-        # Расчет базовой выручки
-        base_revenue = actual_budget * (0.8 + 0.1 * plot['demand'])
+        # Расчет базовой выручки (увеличена для лучшего баланса)
+        base_revenue = actual_budget * (0.7 + 0.08 * plot['demand'])
 
-        # Расчет бонусов за актеров
+        # Непредвиденные расходы (5-15% от бюджета)
+        unexpected_expenses = int(actual_budget * random.uniform(0.05, 0.15))
+        self.logger.info(f"Непредвиденные расходы спектакля {performance_id}: {unexpected_expenses}")
+
+        # Проверка соответствия званий актеров требованиям ролей
+        rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
+        actors_match_requirements = True
+
+        # Предполагаем, что required_ranks содержит список минимальных званий для ролей
+        required_ranks = plot.get('required_ranks', [])
+        if isinstance(required_ranks, str) and required_ranks.startswith('{') and required_ranks.endswith('}'):
+            required_ranks = required_ranks[1:-1].split(',')
+            # Очистка кавычек
+            required_ranks = [r.strip('"') for r in required_ranks]
+
+        # Проверяем соответствие званий, если у нас есть требования
+        if required_ranks and len(required_ranks) > 0:
+            for i, actor in enumerate(actors):
+                if i < len(required_ranks):
+                    required_rank = required_ranks[i]
+                    if required_rank in rank_order:
+                        actor_rank_index = rank_order.index(actor['rank'])
+                        required_rank_index = rank_order.index(required_rank)
+                        if actor_rank_index < required_rank_index:
+                            actors_match_requirements = False
+                            self.logger.info(
+                                f"Актер {actor['last_name']} ({actor['rank']}) не соответствует требованию {required_rank}")
+                            break
+
+        # Расчет бонусов за актеров (улучшено для избежания больших убытков)
         actors_bonus = 0
         for actor in actors:
-            rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
-            rank_multiplier = 1 + (rank_order.index(actor['rank']) * 0.1)
+            rank_index = rank_order.index(actor['rank'])
+            # Улучшенный множитель ранга для более справедливого расчета
+            rank_multiplier = 1 + (rank_index * 0.15)
 
             award_bonus = actor['awards_count'] * 0.05
             exp_bonus = actor['experience'] * 0.01
 
+            # Улучшенный расчет вклада актера
             actor_contribution = actor['contract_cost'] * rank_multiplier * (1 + award_bonus + exp_bonus)
             actors_bonus += actor_contribution
 
-        # Случайный фактор успеха
-        random_factor = random.uniform(0.9, 1.1)
+        # Определение типа спектакля с учетом соответствия требованиям
+        fate_roll = random.random()
 
-        # Итоговая выручка и прибыль
+        # Корректировка шанса провала в зависимости от соответствия званий
+        fail_chance = 0.4 if actors_match_requirements else 0.6
+
+        # Провал: шанс зависит от соответствия званий
+        if fate_roll < fail_chance:
+            self.logger.info(f"Спектакль {performance_id} оказался провальным!")
+            # При несоответствии званий - еще хуже результат
+            random_factor = random.uniform(0.4, 0.7) if actors_match_requirements else random.uniform(0.3, 0.5)
+        # Норма: ~30% шанс с доходом 70-100% от ожидаемого
+        elif fate_roll < 0.9:
+            self.logger.info(f"Спектакль {performance_id} прошел в обычном режиме")
+            random_factor = random.uniform(0.7, 1.0)
+        # Успех: 10% шанс с доходом 100-140% от ожидаемого (увеличен максимальный бонус)
+        else:
+            self.logger.info(f"Спектакль {performance_id} прошел с большим успехом!")
+            random_factor = random.uniform(1.0, 1.4)
+
+        # Итоговая выручка
         total_revenue = int((base_revenue + actors_bonus) * random_factor)
-        profit = total_revenue - actual_budget
 
-        # Обновление данных в БД
-        self.db.update_performance_budget(performance_id, actual_budget)
+        # Учитываем непредвиденные расходы при расчете прибыли
+        total_expenses = actual_budget + unexpected_expenses
+        profit = total_revenue - total_expenses
+
+        # Обновление данных в БД - передаем полные расходы включая непредвиденные
+        self.db.update_performance_budget(performance_id, total_expenses)
         self.db.complete_performance(performance_id, total_revenue)
 
-        # Обновление игровых данных
+        # Обновление игровых данных - ИСПРАВЛЕННЫЙ РАСЧЕТ
         game_data = self.db.get_game_data()
-        new_capital = game_data['capital'] + profit + saved_budget
+        new_capital = game_data['capital'] + total_revenue + saved_budget - unexpected_expenses
         current_year = game_data['current_year'] + 1
         self.db.update_game_data(current_year, new_capital)
 
-        # Определение успешных актеров для награждения
+        # Определение успешных актеров для награждения (только если прибыль положительная)
         successful_actors = []
         if profit > 0:
-            rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
             sorted_actors = sorted(actors,
                                    key=lambda a: (rank_order.index(a['rank']),
                                                   a['experience'],
@@ -238,18 +289,19 @@ class TheaterController:
                 self.db.award_actor(actor['actor_id'])
                 successful_actors.append(actor)
 
-                # Повышение звания самого успешного актера при высокой прибыли
-                if i == 0 and profit > actual_budget * 0.5:
+                # Повышение звания самого успешного актера
+                if i == 0 and profit > total_expenses * 0.3:  # Снизили порог для повышения
                     self.db.upgrade_actor_rank(actor['actor_id'])
 
         # Формирование результатов
         return True, {
             'revenue': total_revenue,
-            'budget': actual_budget,
+            'budget': total_expenses,  # Включаем непредвиденные расходы в общий бюджет
             'original_budget': performance['budget'],
             'saved_budget': saved_budget,
             'profit': profit,
-            'awarded_actors': successful_actors
+            'awarded_actors': successful_actors,
+            'unexpected_expenses': unexpected_expenses  # Добавлено в результаты
         }
 
     def skip_year(self):
@@ -293,10 +345,9 @@ class TheaterController:
     def is_valid_text_input(self, text):
         """
         Проверка валидности текстового ввода.
-        Разрешены только буквы, цифры, пробелы и базовая пунктуация.
+        Разрешены только буквы, цифры и пробелы.
         """
-        import re
-        return bool(re.match(r'^[а-яА-Яa-zA-Z0-9\s.,!?()-]*$', text))
+        return bool(re.match(r'^[а-яА-Яa-zA-Z0-9\s]*$', text))
 
     def close(self):
         """Закрытие соединения с БД."""

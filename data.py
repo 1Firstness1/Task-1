@@ -636,7 +636,7 @@ class DatabaseManager:
             tuple: (успех операции (bool), сообщение об ошибке (str))
         """
         try:
-            # Проверка участия актера в текущих постановках
+            # Проверка участия актера ТОЛЬКО в текущих постановках
             self.cursor.execute("""
                 SELECT COUNT(*) FROM actor_performances ap
                 JOIN performances p ON ap.performance_id = p.performance_id
@@ -653,7 +653,15 @@ class DatabaseManager:
                 self.logger.error("Невозможно удалить актера: минимальное число актеров - 8")
                 return False, "Минимальное число актеров - 8"
 
-            # Удаление актера
+            # Удаление всех связей с прошлыми постановками
+            self.cursor.execute("""
+                DELETE FROM actor_performances 
+                WHERE actor_id = %s AND performance_id IN (
+                    SELECT performance_id FROM performances WHERE is_completed = TRUE
+                )
+            """, (actor_id,))
+
+            # Теперь удаляем самого актера
             self.cursor.execute("DELETE FROM actors WHERE actor_id = %s", (actor_id,))
             self.connection.commit()
             self.logger.info(f"Удален актер с ID {actor_id}")

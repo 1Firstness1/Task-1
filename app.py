@@ -14,6 +14,41 @@ from controller import TheaterController
 from logger import Logger
 
 
+# Add this class to the app.py file
+class ValidatedLoginLineEdit(QLineEdit):
+    """
+    Поле ввода с валидацией для окна логина.
+    Разрешает только определенные символы.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def keyPressEvent(self, event):
+        """Обработка нажатия клавиш с валидацией."""
+        # Сохраняем текущий текст и позицию курсора
+        old_text = self.text()
+        cursor_pos = self.cursorPosition()
+
+        # Вызываем стандартную обработку нажатия клавиш
+        super().keyPressEvent(event)
+
+        # Проверяем валидность нового текста
+        new_text = self.text()
+
+        # Паттерн для проверки - разрешены буквы, цифры, некоторые спецсимволы
+        import re
+        pattern = r'^[а-яА-Яa-zA-Z0-9\s._-]*$'
+
+        # Если текст пустой, разрешаем его
+        if not new_text or re.match(pattern, new_text):
+            return
+
+        # Если текст не валиден, восстанавливаем старый текст
+        self.setText(old_text)
+        self.setCursorPosition(cursor_pos)
+
+
 class LoginDialog(QDialog):
     """
     Диалог авторизации и подключения к базе данных.
@@ -119,21 +154,22 @@ class LoginDialog(QDialog):
         form_layout.addRow(db_label, self.db_combo)
 
         # Поле для ввода хоста
-        self.host_edit = QLineEdit("localhost")
+        self.host_edit = ValidatedLoginLineEdit("localhost")
         self.host_edit.setStyleSheet("color: black;")
         host_label = QLabel("Хост:")
         host_label.setStyleSheet(form_label_style)
         form_layout.addRow(host_label, self.host_edit)
 
         # Поле для ввода порта
-        self.port_edit = QLineEdit("5432")
+        self.port_edit = ValidatedLoginLineEdit("5432")
         self.port_edit.setStyleSheet("color: black;")
+        self.port_edit.setValidator(QIntValidator(1, 65535))
         port_label = QLabel("Порт:")
         port_label.setStyleSheet(form_label_style)
         form_layout.addRow(port_label, self.port_edit)
 
         # Поле для ввода имени пользователя
-        self.user_edit = QLineEdit("postgres")
+        self.user_edit = ValidatedLoginLineEdit("postgres")
         self.user_edit.setStyleSheet("color: black;")
         user_label = QLabel("Пользователь:")
         user_label.setStyleSheet(form_label_style)
@@ -1519,6 +1555,7 @@ class EditActorDialog(QDialog):
         rank_label = QLabel("Звание:")
         rank_label.setStyleSheet(label_style)
         self.rank_combo = QComboBox()
+        self.rank_combo.setMinimumWidth(145)
         rank_order = ['Начинающий', 'Постоянный', 'Ведущий', 'Мастер', 'Заслуженный', 'Народный']
         for rank in rank_order:
             self.rank_combo.addItem(rank)
@@ -1532,7 +1569,7 @@ class EditActorDialog(QDialog):
         awards_label = QLabel("Количество наград:")
         awards_label.setStyleSheet(label_style)
         self.awards_spin = QSpinBox()
-        self.awards_spin.setRange(0, 20)
+        self.awards_spin.setRange(0, 65)
         self.awards_spin.setValue(self.actor['awards_count'])
         layout.addRow(awards_label, self.awards_spin)
 
@@ -1540,7 +1577,7 @@ class EditActorDialog(QDialog):
         exp_label = QLabel("Опыт (лет):")
         exp_label.setStyleSheet(label_style)
         self.exp_spin = QSpinBox()
-        self.exp_spin.setRange(0, 50)
+        self.exp_spin.setRange(0, 65)
         self.exp_spin.setValue(self.actor['experience'])
         layout.addRow(exp_label, self.exp_spin)
 
