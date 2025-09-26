@@ -14,7 +14,6 @@ from controller import TheaterController
 from logger import Logger
 
 
-# Add this class to the app.py file
 class ValidatedLoginLineEdit(QLineEdit):
     """
     Поле ввода с валидацией для окна логина.
