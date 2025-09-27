@@ -347,7 +347,7 @@ class TheaterController:
         Проверка валидности текстового ввода.
         Разрешены только буквы, цифры и пробелы.
         """
-        return bool(re.match(r'^[а-яА-Яa-zA-Z0-9\s]*$', text))
+        return bool(re.match(r'^[а-яА-Яa-zA-Z0-9\s]+$', text))
 
     def close(self):
         """Закрытие соединения с БД."""

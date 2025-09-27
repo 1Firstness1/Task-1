@@ -22,6 +22,7 @@ class ValidatedLoginLineEdit(QLineEdit):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.controller = TheaterController()
 
     def keyPressEvent(self, event):
         """Обработка нажатия клавиш с валидацией."""
@@ -35,12 +36,12 @@ class ValidatedLoginLineEdit(QLineEdit):
         # Проверяем валидность нового текста
         new_text = self.text()
 
-        # Паттерн для проверки - разрешены буквы, цифры, некоторые спецсимволы
-        import re
-        pattern = r'^[а-яА-Яa-zA-Z0-9\s._-]*$'
-
         # Если текст пустой, разрешаем его
-        if not new_text or re.match(pattern, new_text):
+        if not new_text:
+            return
+
+        # Используем функцию валидации
+        if self.controller.is_valid_text_input(new_text):
             return
 
         # Если текст не валиден, восстанавливаем старый текст
@@ -168,7 +169,7 @@ class LoginDialog(QDialog):
         form_layout.addRow(port_label, self.port_edit)
 
         # Поле для ввода имени пользователя
-        self.user_edit = ValidatedLoginLineEdit("postgres")
+        self.user_edit = ValidatedLoginLineEdit("artem")
         self.user_edit.setStyleSheet("color: black;")
         user_label = QLabel("Пользователь:")
         user_label.setStyleSheet(form_label_style)
