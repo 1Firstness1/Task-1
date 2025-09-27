@@ -169,14 +169,14 @@ class LoginDialog(QDialog):
         form_layout.addRow(port_label, self.port_edit)
 
         # Поле для ввода имени пользователя
-        self.user_edit = ValidatedLoginLineEdit("artem")
+        self.user_edit = ValidatedLoginLineEdit("postgres")
         self.user_edit.setStyleSheet("color: black;")
         user_label = QLabel("Пользователь:")
         user_label.setStyleSheet(form_label_style)
         form_layout.addRow(user_label, self.user_edit)
 
         # Поле для ввода пароля
-        self.password_edit = QLineEdit("root")
+        self.password_edit = QLineEdit("postgres")
         self.password_edit.setEchoMode(QLineEdit.Password)
         self.password_edit.setStyleSheet("color: black;")
         password_label = QLabel("Пароль:")
